@@ -48,6 +48,8 @@ jobs:
             #### 🌟 Novedades:
             - 🖤 **Modo AMOLED Puro:** Fondo negro absoluto (#000000) en todos los componentes para ahorro de batería.
             - 📡 **Soporte de Cast Ampliado:** Compatibilidad tanto con Google Cast (Chromecast) como con dispositivos **Amazon Echo / Alexa** y parlantes inteligentes vía DLNA/UPnP.
+            - 🎤 **Letras Sincronizadas en Tiempo Real:** Botón dedicado en el reproductor para visualizar y seguir la letra sincronizada línea a línea estilo karaoke.
+            - ⚙️ **Acerca de... Simplificado:** Pantalla "Acerca de..." renovada con versión dinámica y autoría de RUSSOFRANCO86.
             - 🎨 **Nuevo Ícono:** Identidad visual renovada con Spotify, YouTube Music y notas musicales.
             - 🎧 Fusión total entre Spotify (recomendaciones/listas) y YouTube Music (streaming sin anuncios).
             

@@ -1224,6 +1224,23 @@ fun BottomSheetPlayer(
                             }
                         }
 
+                        FilledIconButton(
+                            onClick = { showInlineLyrics = !showInlineLyrics },
+                            shape = middleShape,
+                            colors =
+                                IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = if (showInlineLyrics) MaterialTheme.colorScheme.primary else textButtonColor,
+                                    contentColor = if (showInlineLyrics) MaterialTheme.colorScheme.onPrimary else iconButtonColor,
+                                ),
+                            modifier = Modifier.size(42.dp),
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.lyrics),
+                                contentDescription = stringResource(R.string.lyrics),
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+
                         AnimatedContent(targetState = showInlineLyrics, label = "LikeButton") { showLyrics ->
                             if (showLyrics) {
                                 val currentLyrics by playerConnection.currentLyrics.collectAsStateWithLifecycle(initialValue = null)
@@ -1341,6 +1358,27 @@ fun BottomSheetPlayer(
                                 )
                             }
                         }
+                    }
+
+                    Spacer(modifier = Modifier.size(12.dp))
+
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(if (showInlineLyrics) MaterialTheme.colorScheme.primary else textButtonColor)
+                                .clickable { showInlineLyrics = !showInlineLyrics },
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.lyrics),
+                            contentDescription = stringResource(R.string.lyrics),
+                            tint = if (showInlineLyrics) MaterialTheme.colorScheme.onPrimary else iconButtonColor,
+                            modifier =
+                                Modifier
+                                    .align(Alignment.Center)
+                                    .size(24.dp),
+                        )
                     }
 
                     Spacer(modifier = Modifier.size(12.dp))

@@ -64,10 +64,6 @@ fun PrivacySettings(
         key = DisableScreenshotKey,
         defaultValue = false
     )
-    val (crashReportingEnabled, onCrashReportingEnabledChange) = rememberPreference(
-        key = CrashReportingEnabledKey,
-        defaultValue = true
-    )
 
     var showClearListenHistoryDialog by remember {
         mutableStateOf(false)
@@ -246,27 +242,6 @@ fun PrivacySettings(
                         )
                     },
                     onClick = { onDisableScreenshotChange(!disableScreenshot) }
-                ),
-                Material3SettingsItem(
-                    icon = painterResource(R.drawable.bug_report),
-                    title = { Text(stringResource(R.string.crash_reporting)) },
-                    description = { Text(stringResource(R.string.crash_reporting_desc)) },
-                    trailingContent = {
-                        Switch(
-                            checked = crashReportingEnabled,
-                            onCheckedChange = onCrashReportingEnabledChange,
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (crashReportingEnabled) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(androidx.compose.material3.SwitchDefaults.IconSize)
-                                )
-                            }
-                        )
-                    },
-                    onClick = { onCrashReportingEnabledChange(!crashReportingEnabled) }
                 )
             )
         )

@@ -141,12 +141,9 @@ android {
             }
         }
         debug {
-            if (applicationIdOverride == null) {
-                applicationIdSuffix = ".debug"
-            }
             isDebuggable = true
             if (appNameOverride == null) {
-                resValue("string", "app_name", "FrMusic4all Debug")
+                resValue("string", "app_name", "FrMusic4all")
             }
             signingConfig =
                 if (workflowDebugKeystoreFile != null) {
