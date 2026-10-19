@@ -544,6 +544,16 @@ class DlnaCastHandler(
         val escapedUrl = escapeXml(streamUrl)
         val escapedThumb = escapeXml(metadata.thumbnailUrl ?: "")
 
+        val mime = if (metadata.id.startsWith("radio:") || streamUrl.contains(".mp3", ignoreCase = true)) {
+            "audio/mpeg"
+        } else if (streamUrl.contains(".ogg", ignoreCase = true) || streamUrl.contains(".opus", ignoreCase = true)) {
+            "audio/ogg"
+        } else if (streamUrl.contains(".aac", ignoreCase = true)) {
+            "audio/aac"
+        } else {
+            "audio/mp4"
+        }
+
         return "<DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\">" +
             "<item id=\"1\" parentID=\"0\" restricted=\"1\">" +
             "<dc:title>$escapedTitle</dc:title>" +
@@ -552,7 +562,7 @@ class DlnaCastHandler(
             "<upnp:album>$escapedAlbum</upnp:album>" +
             "<upnp:albumArtURI>$escapedThumb</upnp:albumArtURI>" +
             "<upnp:class>object.item.audioItem.musicTrack</upnp:class>" +
-            "<res protocolInfo=\"http-get:*:audio/mp4:*\">$escapedUrl</res>" +
+            "<res protocolInfo=\"http-get:*:$mime:*\">$escapedUrl</res>" +
             "</item>" +
             "</DIDL-Lite>"
     }

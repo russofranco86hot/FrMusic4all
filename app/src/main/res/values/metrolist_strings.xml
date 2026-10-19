@@ -1226,4 +1226,25 @@
     <string name="collapse">Collapse</string>
     <string name="about_title">Acerca de…</string>
     <string name="spotify_connect_echo_hint">Make sure your Amazon Echo is on the same Wi-Fi, or say “Alexa, Spotify Connect” to activate it.</string>
+
+    <!-- Radio feature strings -->
+    <string name="radio_tab_favorites">Favorites</string>
+    <string name="radio_tab_top">Top</string>
+    <string name="radio_tab_countries">Countries</string>
+    <string name="radio_tab_genres">Genres</string>
+    <string name="radio_search_hint">Search radio stations…</string>
+    <string name="radio_export_favorites">Export M3U</string>
+    <string name="radio_import_favorites">Import M3U</string>
+    <string name="radio_export_success">Favorites exported to M3U</string>
+    <string name="radio_export_failed">Failed to export favorites</string>
+    <string name="radio_import_success">Imported %d stations</string>
+    <string name="radio_import_failed">Failed to import M3U file</string>
+    <string name="radio_empty_favorites">No favorite radio stations yet</string>
+    <string name="radio_empty_favorites_hint">Add stations to favorites by tapping the star icon</string>
+    <string name="radio_empty_stations">No radio stations found</string>
+    <string name="radio_station_added_favorite">Added to favorites</string>
+    <string name="radio_station_removed_favorite">Removed from favorites</string>
+    <string name="radio_loading">Loading stations…</string>
+    <string name="radio_all_countries">All Countries</string>
+    <string name="radio_all_genres">All Genres</string>
 </resources>

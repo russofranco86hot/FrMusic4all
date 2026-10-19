@@ -38,6 +38,7 @@ import com.metrolist.music.ui.screens.playlist.LocalPlaylistScreen
 import com.metrolist.music.ui.screens.playlist.OnlinePlaylistScreen
 import com.metrolist.music.ui.screens.playlist.SpotifyLikedSongsScreen
 import com.metrolist.music.ui.screens.album.SpotifyAlbumScreen
+import com.metrolist.music.ui.screens.radio.RadioScreen
 import com.metrolist.music.ui.screens.library.SpotifyFolderScreen
 import com.metrolist.music.ui.screens.playlist.SpotifyPlaylistScreen
 import com.metrolist.music.ui.screens.playlist.TopPlaylistScreen
@@ -99,6 +100,10 @@ fun NavGraphBuilder.navigationBuilder(
             pureBlack = pureBlack,
             savedStateHandle = backStackEntry.savedStateHandle
         )
+    }
+
+    composable(Screens.Radio.route) {
+        RadioScreen()
     }
 
     composable(Screens.Library.route) {

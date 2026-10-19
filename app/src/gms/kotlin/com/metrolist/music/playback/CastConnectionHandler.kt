@@ -319,10 +319,23 @@ class CastConnectionHandler(
                 .setArtworkUri(metadata.thumbnailUrl?.resize(1080, 1080)?.let(Uri::parse))
                 .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
                 .build()
+        val mimeType = if (metadata.id.startsWith("radio:")) {
+            if (streamUrl.contains(".m3u8", ignoreCase = true)) {
+                MimeTypes.APPLICATION_M3U8
+            } else if (streamUrl.contains(".ogg", ignoreCase = true) || streamUrl.contains(".opus", ignoreCase = true)) {
+                MimeTypes.AUDIO_OGG
+            } else if (streamUrl.contains(".aac", ignoreCase = true)) {
+                MimeTypes.AUDIO_AAC
+            } else {
+                MimeTypes.AUDIO_MPEG
+            }
+        } else {
+            MimeTypes.AUDIO_MP4
+        }
         return item
             .buildUpon()
             .setUri(streamUrl)
-            .setMimeType(MimeTypes.AUDIO_MP4)
+            .setMimeType(mimeType)
             .setMediaMetadata(castMetadata)
             .build()
     }

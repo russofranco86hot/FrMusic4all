@@ -81,6 +81,7 @@ import androidx.media3.exoplayer.audio.SilenceSkippingAudioProcessor
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
+import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ExtractorsFactory
 import androidx.media3.extractor.mkv.MatroskaExtractor
 import androidx.media3.extractor.mp4.FragmentedMp4Extractor
@@ -4519,6 +4520,15 @@ class MusicService :
                 return@Factory dataSpec
             }
 
+            // Handle radio streams and direct audio streams
+            if (mediaId.startsWith("radio:")) {
+                val radioUrl = mediaId.removePrefix("radio:")
+                return@Factory dataSpec.withUri(radioUrl.toUri())
+            }
+            if (mediaId.startsWith("http://") || mediaId.startsWith("https://")) {
+                return@Factory dataSpec.withUri(mediaId.toUri())
+            }
+
 
             val shouldBypassCache = bypassCacheForQualityChange.contains(mediaId)
 
@@ -4890,9 +4900,7 @@ class MusicService :
     ) =
         DefaultMediaSourceFactory(
             createDataSourceFactory(normalizationProcessor, playerProvider),
-            ExtractorsFactory {
-                arrayOf(MatroskaExtractor(), FragmentedMp4Extractor(), Mp4Extractor())
-            },
+            DefaultExtractorsFactory().setConstantBitrateSeekingEnabled(true),
         )
 
     private fun createRenderersFactory(
@@ -5796,6 +5804,12 @@ class MusicService :
     suspend fun getStreamUrl(mediaId: String): String? =
         withContext(Dispatchers.IO) {
             try {
+                if (mediaId.startsWith("radio:")) {
+                    return@withContext mediaId.removePrefix("radio:")
+                }
+                if (mediaId.startsWith("http://") || mediaId.startsWith("https://")) {
+                    return@withContext mediaId
+                }
                 val song = database.songEntity(mediaId)
                 val playbackData =
                     InnerTubeXPlayer
