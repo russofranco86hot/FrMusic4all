@@ -1,0 +1,58 @@
+name: Build & Release FrMusic4all APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build GMS Debug APK
+        run: ./gradlew :app:assembleGmsDebug
+
+      - name: Rename APK for release
+        run: |
+          mkdir -p output
+          cp app/build/outputs/apk/gms/debug/app-gms-debug.apk output/FrMusic4all.apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: FrMusic4All ${{ github.ref_name }}
+          body: |
+            ### 🎵 FrMusic4All ${{ github.ref_name }}
+
+            ¡Bienvenido a la nueva versión de **FrMusic4All**!
+            
+            #### 🌟 Novedades:
+            - 🖤 **Modo AMOLED Puro:** Fondo negro absoluto (#000000) en todos los componentes para ahorro de batería.
+            - 📡 **Soporte de Cast Ampliado:** Compatibilidad tanto con Google Cast (Chromecast) como con dispositivos **Amazon Echo / Alexa** y parlantes inteligentes vía DLNA/UPnP.
+            - 🎨 **Nuevo Ícono:** Identidad visual renovada con Spotify, YouTube Music y notas musicales.
+            - 🎧 Fusión total entre Spotify (recomendaciones/listas) y YouTube Music (streaming sin anuncios).
+            
+            #### 📲 Instalación:
+            1. Descarga el archivo `FrMusic4all.apk` adjunto abajo.
+            2. Ábrelo en tu dispositivo Android.
+            3. Habilita "Permitir desde esta fuente" si el sistema lo solicita y ¡a disfrutar!
+          files: output/FrMusic4all.apk

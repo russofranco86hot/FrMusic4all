@@ -1,271 +1,85 @@
 <div align="center">
-<img src="fastlane/metadata/android/en-US/images/icon.png" width="160" height="160" style="display: block; margin: 0 auto"/>
-<h1>FrMusic4All</h1>
-<p>A music client that fuses Spotify and YouTube Music into one seamless experience</p>
 
-[![Latest release](https://img.shields.io/github/v/release/russofranco86hot/FrMusic4all?style=for-the-badge)](https://github.com/russofranco86hot/FrMusic4all/releases/latest)
-[![GitHub license](https://img.shields.io/github/license/russofranco86hot/FrMusic4all?style=for-the-badge)](https://github.com/russofranco86hot/FrMusic4all/blob/main/LICENSE)
-[![Downloads](https://img.shields.io/github/downloads/russofranco86hot/FrMusic4all/total?style=for-the-badge)](https://github.com/russofranco86hot/FrMusic4all/releases)
+<img src="fastlane/metadata/android/en-US/images/icon.png" width="160" height="160" alt="FrMusic4All Logo" style="display: block; margin: 0 auto; border-radius: 36px;"/>
 
-</div>
+# FrMusic4All
 
-## What is FrMusic4All?
+**El reproductor de música definitivo para Android que fusiona lo mejor de Spotify y YouTube Music en una sola experiencia.**
 
-**FrMusic4All** is an Android music client that brings together the best of Spotify and YouTube Music. It uses your Spotify account to power personalized recommendations, search, and home content — while streaming audio through YouTube Music.
-
-The name **FrMusic4All** reflects the core idea: bringing all music together from Spotify and YouTube Music into a single, unified listening experience for everyone.
-
-### Why FrMusic4All?
-
-- **Spotify's personalization** — Your top tracks, favorite artists, and curated playlists from Spotify drive the recommendations
-- **YouTube Music's catalog** — Access YouTube Music's vast library for streaming, including rare tracks, live performances, and remixes
-- **No setup required** — Just log in with your Spotify account directly in the app. No developer dashboard, no Client ID, no extra steps
-- **No Spotify Premium required** — FrMusic4All uses Spotify's data APIs (not streaming), so a free Spotify account is all you need
-- **Built-in recommendation engine** — A custom algorithm builds personalized queues using your Spotify listening history, without relying on deprecated API endpoints
-
-## Features
-
-### Spotify Integration
-- **Spotify as search source** — Search results powered by Spotify, with automatic YouTube Music matching for playback
-- **Spotify as home source** — Home screen populated with your Spotify top tracks, top artists, playlists, and new releases
-- **Spotify-only mode** — Option to hide all YouTube-based content and show exclusively Spotify-powered sections on the home screen
-- **Smart queue generation** — Custom recommendation engine that builds radio-like queues from your Spotify taste profile (top tracks/artists across 3 time ranges, genre similarity, popularity matching)
-- **Spotify library sync** — Access your Spotify playlists and liked songs directly in the app
-- **Spotify-to-YouTube matching** — Fuzzy matching algorithm with local caching for fast, accurate track resolution
-- **Manual match override** — If a Spotify track is matched to the wrong YouTube video, you can manually fix it by pasting the correct YouTube link. The override is saved permanently and takes priority over automatic matching
-- **Spotify album browsing** — Dedicated album screen for Spotify albums with full tracklist, metadata, and one-tap playback
-- **Hybrid profile cache** — 3-tier data strategy (GraphQL → REST API → local DB) with persistent caching for instant home screen loading on app restart, automatic rate-limit handling, and parallel artist image enrichment
-- **Artist navigation** — Tap any Spotify artist on the home screen to navigate directly to their YouTube Music artist page
-
-### Lossless Audio (Experimental)
-- **Qobuz backend** — Optional FLAC and Hi-Res (up to 24-bit / 192 kHz) streaming via the Qobuz catalog, replacing YouTube Music's lossy audio
-- **Deterministic matching** — Uses ISRC (the universal track identifier shared by Spotify and Qobuz) so Spotify-sourced tracks resolve to their exact Qobuz counterpart without ambiguity
-- **Persistent match cache** — Once a track has been resolved on Qobuz, the match is saved locally so subsequent plays skip the search step entirely
-- **Multi-backend fallback** — Three independent Qobuz resolvers (Monokenny, Jumo, Squid) are tried in sequence if the primary one is rate-limited or unavailable
-- **Quality tiers** — Choose between AAC 320 kbps, CD quality (16-bit / 44.1 kHz), or Hi-Res (up to 24-bit / 192 kHz) per your preference and connection
-- **Automatic YouTube fallback** — If a track isn't on Qobuz, or all resolvers fail, playback falls back silently to the standard YouTube Music stream — no error, no skip
-- **Hidden behind a toggle** — Disabled by default; opt-in from the Spotify integration settings
-
-### Core Music Features
-- Play any song or video from YouTube Music
-- Background playback
-- Personalized quick picks
-- Library management
-- Listen together with friends
-- Download and cache songs for offline playback
-- Search for songs, albums, artists, videos and playlists
-- Live lyrics
-- YouTube Music account login support
-- Syncing of songs, artists, albums and playlists, from and to your account
-- Skip silence
-- Import playlists
-- Audio normalization
-- Adjust tempo/pitch
-- Local playlist management
-- Reorder songs in playlist or queue
-- Home screen widget with playback controls
-- Light / Dark / Black / Dynamic theme
-- Sleep timer
-- Material 3 design
-- Discord Rich Presence
-
-## Download
-
-<div align="center">
-<a href="https://github.com/russofranco86hot/FrMusic4all/releases/latest/download/FrMusic4all.apk"><img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" alt="Get it on GitHub" height="82"></a>
-</div>
-
-> **First time here?** Tap the badge above or go to the [Releases page](https://github.com/russofranco86hot/FrMusic4all/releases), then download the **FrMusic4all.apk** file and open it on your Android device. You may need to allow installation from unknown sources in your phone's settings.
-
-<div align="center">
-
-**Enjoying FrMusic4All?** Consider supporting the project
-
-<a href="https://buymeacoffee.com/francescogm"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
+[![GitHub Release](https://img.shields.io/github/v/release/russofranco86hot/FrMusic4all?color=1ED760&style=for-the-badge&logo=android)](https://github.com/russofranco86hot/FrMusic4all/releases/latest)
+[![License](https://img.shields.io/github/license/russofranco86hot/FrMusic4all?color=FF0033&style=for-the-badge)](LICENSE)
 
 </div>
 
-## How the Spotify Integration Works
+---
 
-FrMusic4All connects to your Spotify account through a built-in WebView login — no developer setup or Client ID required. Here's what happens under the hood:
+## 🎵 ¿Qué es FrMusic4All?
 
-1. **Authentication** — You log in with your regular Spotify credentials (email, Google, Facebook, or Apple) directly inside the app. FrMusic4All extracts session cookies and generates access tokens using TOTP, keeping you logged in without manual token management.
-2. **Data layer** — FrMusic4All communicates with Spotify primarily through GraphQL endpoints (for playlists, liked songs, artist details, albums, new releases, and search) with REST API fallbacks for top tracks and top artists. GraphQL avoids the aggressive rate limits that affect REST endpoints.
-3. **Home screen** — When "Use Spotify for Home" is enabled, FrMusic4All builds a personalized home feed from your top tracks, top artists, playlists, and new releases. Enable "Spotify only" to hide all YouTube-based sections for a fully Spotify-driven experience.
-4. **Profile caching** — Your Spotify profile data (top tracks, top artists with images) is persisted locally and served instantly on app restart. Background network refreshes only happen when the cache is stale (6-hour TTL), keeping the home screen fast and responsive.
-5. **Search** — When "Use Spotify for Search" is enabled, search queries go through Spotify's GraphQL search. Results are displayed as Spotify content; tapping a song resolves it to YouTube Music for playback.
-6. **Queue generation** — When you play a Spotify-sourced song, FrMusic4All's recommendation engine builds a queue by:
-   - Fetching top tracks from the song's artists
-   - Finding genre-similar artists from your taste profile
-   - Mixing in tracks from your personal top tracks pool
-   - Scoring candidates by artist affinity (30%), genre overlap (20%), source relevance (25%), recency (15%), and popularity similarity (10%)
-   - Diversifying the queue to avoid repetition (max 3 tracks per artist)
-7. **Playback** — Each Spotify track is matched to its YouTube Music equivalent using fuzzy title/artist/duration matching, then streamed via YouTube Music's infrastructure. Matched results are cached locally for instant resolution on subsequent plays. If a match is wrong, you can manually override it from the player's three-dot menu → "Change YouTube version" by pasting the correct YouTube link.
+**FrMusic4All** es una aplicación de música para Android diseñada para ofrecer una experiencia auditiva completa, fluida y sin interrupciones. Une la inteligencia de recomendación y las listas personalizadas de **Spotify** con el catálogo gigantesco y la reproducción sin anuncios de **YouTube Music**.
 
-## How the Qobuz Lossless Integration Works
+Todo esto sin necesidad de pagar suscripciones Premium de Spotify y con soporte de audio en alta resolución.
 
-When the Qobuz toggle is enabled (Settings → Integrations → Spotify → "Use Qobuz for lossless playback"), FrMusic4All routes audio through Qobuz's FLAC catalog instead of YouTube Music's lossy AAC streams. The integration is fully opt-in and falls back to YouTube Music whenever Qobuz can't deliver — there's no playback interruption either way.
+---
 
-1. **Match resolution** — For every track about to play, FrMusic4All looks up the song on Qobuz. Spotify-sourced tracks include the **ISRC** (the universal track identifier — the same ISRC points to the same recording across Spotify, Qobuz, Tidal, etc.) which produces an exact, deterministic match. YT-native tracks fall back to fuzzy title/artist/album matching using the cached song metadata.
-2. **Backend cycling** — Qobuz is accessed through three independent open community resolvers (Monokenny, Jumo, Squid). The primary backend is configurable; if it returns a preview, captcha challenge, or any other failure, FrMusic4All automatically retries on the alternates before giving up. Backends that hit a captcha are skipped for five minutes to avoid wasted retries.
-3. **Persistent caching** — A successful match (the Qobuz track ID, hi-res tier, bit depth, sample rate) is saved in the local database keyed by the YouTube ID, so the next play of the same song skips the search step entirely and resolves in a few hundred milliseconds. ISRCs discovered during a Qobuz resolve are also written back to the song's row, which improves the accuracy of future matches across the whole library.
-4. **Quality tier downgrade** — When the saved match knows the track only exists at CD quality on Qobuz (not Hi-Res), FrMusic4All caps the requested quality automatically to avoid the wasted "preview returned" round-trip.
-5. **YouTube fallback** — If every Qobuz backend fails (track not in catalog, all resolvers down, network issue, etc.), playback proceeds through the standard YouTube Music pipeline with the lossy AAC stream. The fallback is silent and instant; subsequent plays will try Qobuz again.
+## ✨ Novedades y Mejoras Clave
 
-> **Important — third-party services:** The Qobuz resolvers are run by independent community projects, not by us. They may go down, get rate-limited, or stop working at any time without notice. When they do, playback automatically falls back to YouTube Music — but you may notice slower start times during the failed Qobuz attempt.
+### 🖤 Modo AMOLED Puro (#000000)
+- **Negro absoluto real:** Diseñado específicamente para pantallas OLED y AMOLED, apagando los píxeles negros en todos los menús, tarjetas, barras de navegación y reproductor.
+- **Ahorro máximo de batería:** Disfruta de tus sesiones musicales con el menor consumo de energía posible.
 
-> **Bandwidth and storage:** FLAC streams use 3–10× more data than the standard AAC. Hi-Res (24-bit / 96+ kHz) can exceed 1.5 Mbit/s and use ~30 MB per song downloaded. Consider this if you're on a limited mobile plan or have tight storage.
+### 📡 Soporte de Cast Ampliado (Google Cast + Amazon Echo)
+- **Google Cast:** Reproduce tu música directamente en televisores con Android TV, Chromecast y dispositivos Google Nest.
+- **Amazon Echo y Parlantes Inteligentes (DLNA / UPnP):** Ahora puedes castear tu música fácilmente a altavoces Amazon Echo (Alexa), barras de sonido, receptores y cualquier dispositivo compatible con DLNA en tu red Wi-Fi local.
 
-## Setup
+### 🎨 Nueva Identidad Visual
+- Nuevo ícono integrado que representa la armonía entre Spotify, YouTube Music y notas musicales sobre un fondo negro profundo.
+- Interfaz completamente basada en **Material 3** limpia, moderna e intuitiva.
 
-### Spotify Integration
+---
 
-1. In FrMusic4All, go to **Settings → Integrations → Spotify**
-2. Tap **Login** — a Spotify login page will open directly inside the app
-3. Sign in with your Spotify account (email/password, Google, Facebook, or Apple)
-4. Once logged in, enable **"Use Spotify for Search"** and/or **"Use Spotify for Home"** — these are off by default
-5. Optionally enable **"Spotify only"** to hide all YouTube-based content from the home screen
-6. Go back to the home screen and **pull down to refresh**. Your Spotify playlists, top tracks, and recommendations should appear within a few seconds.
+## 🚀 Características Principales
 
-> **Note:** No developer account, Client ID, or any external setup is required. Just log in with your regular Spotify account — free or Premium.
+### 🎧 Fusión Spotify + YouTube Music
+- **Recomendaciones con tu cuenta de Spotify:** Inicia sesión con tu cuenta gratuita de Spotify directamente en la app (sin configuraciones complejas ni claves de desarrollador) para tener tus canciones favoritas, artistas más escuchados y listas directamente en la pantalla de inicio.
+- **Catálogo infinito:** Cada canción se reproduce al instante utilizando los streams de YouTube Music, asegurando disponibilidad incluso de versiones en vivo, remixes y canciones difíciles de encontrar.
+- **Opción de audio Lossless (Qobuz):** Soporte experimental para streaming en FLAC de alta resolución (hasta 24-bit / 192 kHz).
 
-> **Important:** For reliable playback, disable battery optimization for FrMusic4All in your phone settings (**Settings → Apps → FrMusic4All → Battery → Unrestricted**). Without this, Android may throttle the app and cause long delays before songs start playing.
+### 🎶 Reproductor Avanzado
+- **Reproducción en segundo plano:** Escucha tu música con la pantalla apagada o mientras usas otras aplicaciones.
+- **Modo sin conexión (Offline):** Descarga tus canciones y listas favoritas o aprovecha la caché automática para reproducirlas sin internet.
+- **Letras sincronizadas palabra por palabra (Live Lyrics):** Visualiza letras en tiempo real con efectos visuales animados y estilo karaoke.
+- **Listen Together:** Crea una sala y escucha música en tiempo real y sincronizada con tus amigos a distancia.
+- **Ecualizador paramétrico y AutoEQ:** Perfiles de ecualización automáticos calibrados para cientos de modelos de auriculares populares (Sony, Bose, Sennheiser, etc.).
+- **Salto de silencios y normalización de volumen:** Pasa directamente a la música sin silencios incómodos y con un volumen constante entre pistas.
+- **Integraciones:** Compatibilidad con Android Auto, widgets para la pantalla de inicio y Discord Rich Presence.
 
-### Qobuz Lossless (Optional)
+---
 
-1. Make sure Spotify integration is set up first (see above) — Qobuz lives under the same settings screen
-2. Scroll to the **"Audio quality (experimental)"** section at the bottom of **Settings → Integrations → Spotify**
-3. Enable **"Use Qobuz for lossless playback"**
-4. Pick a **quality tier** — AAC 320, CD (recommended default), or Hi-Res
-5. Pick a **resolver backend** — Monokenny is the recommended default; Jumo and Squid are alternates that the app also rotates through automatically on failure
-6. Set the **country code** (ISO two-letter, e.g. `US`, `IT`, `FR`) — this affects which regional Qobuz catalog is queried
+## 📥 Descarga e Instalación
 
-That's it — the next time you play a song, FrMusic4All will try Qobuz first and fall back to YouTube Music if the track isn't available there. The toggle can be turned off at any time to revert to YouTube-only playback.
+Para instalar la aplicación en tu celular Android de forma rápida:
 
-> **Hot-reload:** Toggling Qobuz on/off, switching backend, quality, or country code automatically reloads the currently playing track so the new source takes effect immediately. **No app restart is required.**
+1. Ve a la sección de [**Releases Oficiales**](https://github.com/russofranco86hot/FrMusic4all/releases/latest).
+2. Descarga el archivo instalador **`FrMusic4all.apk`**.
+3. Abre el archivo descargado en tu celular.
+4. Si tu teléfono lo solicita, permite la opción *"Instalar aplicaciones de fuentes desconocidas"*.
+5. ¡Abre **FrMusic4All** y disfruta de tu música!
 
-### Building from source
+---
 
-For GitHub Actions builds, add these secrets to your repository:
-- `LASTFM_API_KEY` / `LASTFM_SECRET` — from [last.fm/api/account/create](https://www.last.fm/api/account/create)
+## 🛠️ Tecnologías Utilizadas
 
-## FAQ
+- **Lenguaje:** Kotlin
+- **Interfaz de Usuario:** Jetpack Compose con Material 3 y MaterialKolor
+- **Motor de Audio:** AndroidX Media3 (ExoPlayer) + RemoteCastPlayer
+- **Protocolo de Streaming Local:** jUPnP / DLNA para dispositivos Amazon Echo y Smart Speakers
+- **Inyección de Dependencias:** Dagger Hilt
+- **Base de Datos Local:** Android Room + Proto DataStore
 
-### Q: How do I download and install FrMusic4All?
+---
 
-Go to the [latest release](https://github.com/russofranco86hot/FrMusic4all/releases/latest) and download the **FrMusic4all.apk** file. Open it on your Android device — you may need to allow "Install from unknown sources" in your phone's settings when prompted. You do **not** need to download the source code files.
+## 📄 Créditos y Licencia
 
-### Q: I saw a FrMusic4All APK on a third-party website, is it safe?
+FrMusic4All es un proyecto libre y de código abierto desarrollado bajo la licencia **GPL-3.0**, basado originalmente en la base de código de [Metrolist](https://github.com/MetrolistGroup/Metrolist) creado por Mo Agamy.
 
-No, GitHub is the only place officially supported for FrMusic4All releases. Any other place is not official and thus can be dangerous.
-
-### Q: I saw FrMusic4All flagged by Malwarebytes or another antivirus, is it infected?
-
-No, it's a false positive. FrMusic4All is based on [Metrolist](https://github.com/metrolistgroup/metrolist) which is sometimes flagged with the same false positive. Both FrMusic4All and Metrolist are fully open-source projects using the GPL-3.0 license, with the entire source code accessible through [GitHub](https://github.com/russofranco86hot/FrMusic4all).
-
-### Q: Is there a FrMusic4All PC app? When will it release?
-
-Not yet, but it is in the works and should release soon. No date is set in stone, but we estimate the release to be before the end of this year. (So if you ask "FrMusic4All PC?", the current answer is NO, but it's coming!)
-
-### Q: I logged into Spotify but my playlists aren't showing
-
-After logging in, make sure you've enabled **"Use Spotify for Home"** and/or **"Use Spotify for Search"** in **Settings → Integrations → Spotify**. These are off by default. Then go back to the home screen and **pull down to refresh**. The first load may take a few seconds; subsequent launches will be instant thanks to local caching.
-
-### Q: Songs aren't playing / playback is very slow to start
-
-If songs aren't playing or take a long time to start, try the following possible fixes:
-
-1. **Disable battery optimization for FrMusic4All** — Go to your phone's **Settings → Apps → FrMusic4All → Battery → Unrestricted** (or "No restrictions"). This is the most common fix. Android aggressively throttles background network and CPU usage for battery-optimized apps.
-2. Go to **Settings → Player → Audio Quality** → set to low, wait a few seconds, then set to high.
-3. Force stop the app, clear the cache, then open it again.
-4. Log out of your Google account, then log back in again.
-5. Wait a moment — the first playback after a fresh launch requires initializing the streaming engine. Subsequent plays are much faster.
-6. Check your internet connection.
-
-In general, the first time you play a song it's normal for it to take a longer time (downloading metadata, YouTube matching). From the second time it will be stored in a local DB and this process won't be needed. If it's still broken, go to the support channel.
-
-### Q: Does FrMusic4All work with Bluetooth headphones / AirPods?
-
-Yes. FrMusic4All streams audio through YouTube Music's infrastructure like any other music player. It works with any audio output device including Bluetooth headphones, AirPods, car stereos, and speakers.
-
-### Q: Why isn't FrMusic4All showing in Android Auto?
-
-1. Go to Android Auto's settings and tap multiple times on the version in the bottom to enable developer settings
-2. In the three dots menu at the top-right of the screen, click "Developer settings"
-3. Enable "Unknown sources"
-
-### Q: Do I need Spotify Premium?
-
-No. FrMusic4All uses Spotify for data only (your library, top tracks, search results) — not for audio streaming. Audio is streamed through YouTube Music. A free Spotify account works perfectly.
-
-### Q: Some songs won't play — I get a playback error or age/country restriction
-
-This is a YouTube Music limitation and FrMusic4All can't do anything about it directly. Certain tracks on YouTube may be age-restricted or region-locked. If you're not logged into YouTube, some of these tracks cannot be played because YouTube requires authentication. To fix this:
-
-1. Go to **Settings → Account** and log in with your YouTube / Google account
-2. Go back and try playing the song again
-
-If the track still doesn't play after logging in, it may be restricted in your country or permanently unavailable.
-
-### Q: I get the wrong song, a cover, or just want to change the song version (matching issues)
-
-The Spotify-to-YouTube matching uses fuzzy matching. You can manually fix an incorrect match:
-
-1. Play the song that has the wrong match
-2. Tap the **three-dot menu (⋮)** at the bottom-right of the Now Playing screen
-3. Tap **"Change YouTube version"** (this option only appears for Spotify-sourced tracks)
-4. Paste the correct YouTube or YouTube Music link in the input field
-5. A preview of the new match will appear — verify it's the right one and tap **OK**
-6. The player will automatically switch to the new version
-
-*P.S. This does not work if you have Qobuz enabled.*
-
-### Q: How does Qobuz lossless playback work?
-
-When enabled, FrMusic4All looks up each track on Qobuz and streams the FLAC file directly. Spotify-sourced tracks are matched via ISRC (the universal track identifier) for an exact match; YouTube-native tracks fall back to fuzzy title/artist matching. If the track isn't on Qobuz, or all backend resolvers are temporarily down, playback falls back silently to the standard YouTube Music stream.
-
-The Qobuz resolvers are run by independent community projects — they're not affiliated with us. They can go down or get rate-limited at any time. When that happens, the fallback to YouTube Music is automatic and instant, but you may notice a delay on the first attempt while the failed resolvers are skipped.
-
-Also note that FLAC streams use 3–10× more data than the standard AAC. Hi-Res files can exceed 30 MB per song. If you're on a metered mobile plan or tight on storage, stick to CD quality or keep the feature off on cellular.
-
-### Q: Why did some songs play in lossless and others didn't?
-
-Not every track exists on Qobuz, and not every track exists at every quality tier. If Qobuz returns only a preview (no full stream available) or all resolvers fail, FrMusic4All falls back to YouTube Music silently and remembers the result. Less popular tracks, indie releases, and rare regional versions are the most common cases. The fallback is the intended behavior and the audio will keep playing — just not in FLAC for that specific track.
-
-### Q: Can my Spotify or YouTube account get banned?
-
-**Spotify:** FrMusic4All uses Spotify's APIs in read-only mode to access your library, playlists, and recommendations. It does **not** stream audio from Spotify, generate artificial plays, or modify your account data. While using unofficial API clients technically falls outside Spotify's Terms of Service, the risk of account action is considered low — similar apps have operated for years without widespread bans. That said, **use FrMusic4All at your own risk** and consider using a secondary Spotify account if you're concerned.
-
-**YouTube/Google:** Audio is streamed through YouTube Music's infrastructure using the InnerTube API. Google has historically been more aggressive with unofficial clients. To minimize risk:
-- Avoid logging into your Google account in FrMusic4All unless needed for age-restricted content
-- Using FrMusic4All without a Google login carries minimal risk to your Google account
-- If you do log in, be aware this carries a small but nonzero risk
-
-**Bottom line:** No bans have been reported by FrMusic4All users to date. However, as with any third-party client, we cannot guarantee that platform policies won't change in the future.
-
-### Q: I have a niche request that is not fulfilled by the dev
-
-The app is only maintained by one dev and he also has a life. Just enjoy the free music and please don't DM/email the dev if you have any questions or enquiries — keep it in its designated channel in the server.
-
-## Credits
-
-FrMusic4All is a fork of [Metrolist](https://github.com/MetrolistGroup/Metrolist), originally created by [Mo Agamy](https://github.com/mostafaalagamy).
-
-### Upstream Projects
-
-- **InnerTune** — [Zion Huang](https://github.com/z-huang) · [Malopieds](https://github.com/Malopieds)
-- **OuterTune** — [Davide Garberi](https://github.com/DD3Boh) · [Michael Zh](https://github.com/mikooomich)
-
-### Libraries and Integrations
-
-- [**Kizzy**](https://github.com/dead8309/Kizzy) — Discord Rich Presence implementation
-- [**Better Lyrics**](https://better-lyrics.boidu.dev) — Time-synced lyrics with word-by-word highlighting
-- [**SimpMusic Lyrics**](https://github.com/maxrave-dev/SimpMusic) — Lyrics data through the SimpMusic Lyrics API
-- [**metroserver**](https://github.com/MetrolistGroup/metroserver) — Listen Together implementation
-- [**MusicRecognizer**](https://github.com/aleksey-saenko/MusicRecognizer) — Music recognition and Shazam API integration
-
-## Disclaimer
-
-This project and its contents are not affiliated with, funded, authorized, endorsed by, or in any way associated with YouTube, Google LLC, Spotify AB, or any of their affiliates and subsidiaries.
-
-Any trademark, service mark, trade name, or other intellectual property rights used in this project are owned by the respective owners.
+*Aviso: Este proyecto no está afiliado ni respaldado oficialmente por Spotify AB, Google LLC ni Amazon.com.*

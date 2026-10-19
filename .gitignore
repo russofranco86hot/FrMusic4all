@@ -9,3 +9,5 @@
 .cxx
 local.properties
 app/persistent-debug.keystore
+*.apk
+release/
