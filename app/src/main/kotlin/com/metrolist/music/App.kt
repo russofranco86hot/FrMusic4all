@@ -46,6 +46,7 @@ import com.metrolist.music.utils.ArtistNameAliases
 import com.metrolist.music.utils.CrashReporter
 import com.metrolist.music.utils.InnerTubeXPlayer
 import com.metrolist.music.utils.SpotifyHashSync
+import com.metrolist.music.playback.SpotifyConnectManager
 import com.metrolist.music.utils.SpotifyTokenManager
 import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.installPreferencesSnapshotCollector
@@ -218,6 +219,7 @@ class App :
 
         // Initialize centralized token manager and restore/refresh Spotify token
         SpotifyTokenManager.init(dataStore)
+        SpotifyConnectManager.init(this@App)
         applicationScope.launch(Dispatchers.IO) {
             SpotifyTokenManager.ensureAuthenticated()
         }

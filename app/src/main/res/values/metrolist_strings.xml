@@ -1225,4 +1225,5 @@
     <string name="playing_on">Playing on %s</string>
     <string name="collapse">Collapse</string>
     <string name="about_title">Acerca de…</string>
+    <string name="spotify_connect_echo_hint">Make sure your Amazon Echo is on the same Wi-Fi, or say “Alexa, Spotify Connect” to activate it.</string>
 </resources>

@@ -78,7 +78,7 @@ fun CastDevicePicker(
     val selectedDlnaDevice by dlnaHandler?.selectedDevice?.collectAsStateWithLifecycle() ?: androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<com.metrolist.music.playback.DlnaDevice?>(null) }
 
     LaunchedEffect(Unit) {
-        SpotifyConnectManager.scanDevices()
+        SpotifyConnectManager.scanDevices(context)
         dlnaHandler?.startDiscovery()
     }
 
@@ -120,7 +120,7 @@ fun CastDevicePicker(
                 } else {
                     IconButton(
                         onClick = {
-                            SpotifyConnectManager.scanDevices()
+                            SpotifyConnectManager.scanDevices(context)
                             dlnaHandler?.startDiscovery()
                         },
                         modifier = Modifier.size(32.dp),
@@ -274,12 +274,20 @@ fun CastDevicePicker(
                     }
                 } else if (spotifyDevices.isEmpty() && !isSpotifyScanning) {
                     item {
-                        Text(
-                            text = stringResource(R.string.dlna_no_devices),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.spotify_connect_echo_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(12.dp),
+                            )
+                        }
                     }
                 } else {
                     items(spotifyDevices) { device ->
@@ -304,6 +312,15 @@ fun CastDevicePicker(
                                 ).show()
                                 onDismissRequest()
                             },
+                        )
+                    }
+
+                    item {
+                        Text(
+                            text = stringResource(R.string.spotify_connect_echo_hint),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                         )
                     }
                 }
