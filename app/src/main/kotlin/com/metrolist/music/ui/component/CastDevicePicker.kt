@@ -300,17 +300,31 @@ fun CastDevicePicker(
                             subtitle = typeDesc,
                             isActive = isCurrentActive || device.isActive,
                             onClick = {
+                                Toast.makeText(
+                                    context,
+                                    "Conectando a ${device.name}…",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                                onDismissRequest()
                                 SpotifyConnectManager.connectToDevice(
                                     device = device,
                                     currentMedia = mediaMetadata,
                                     onLocalPause = { playerConnection.player.pause() },
+                                    onSuccess = { name ->
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.playing_on, name),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    },
+                                    onError = { error ->
+                                        Toast.makeText(
+                                            context,
+                                            error,
+                                            Toast.LENGTH_LONG,
+                                        ).show()
+                                    },
                                 )
-                                Toast.makeText(
-                                    context,
-                                    context.getString(R.string.playing_on, device.name),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                                onDismissRequest()
                             },
                         )
                     }

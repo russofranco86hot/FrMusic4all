@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 /**
@@ -138,17 +139,45 @@ object SpotifyConnectManager {
         device: SpotifyDevice,
         currentMedia: MediaMetadata?,
         onLocalPause: (() -> Unit)? = null,
+        onSuccess: ((String) -> Unit)? = null,
+        onError: ((String) -> Unit)? = null,
     ) {
-        val deviceId = device.id ?: return
+        val initialDeviceId = device.id ?: return
         scope.launch {
             try {
                 val authed = SpotifyTokenManager.ensureAuthenticated()
-                if (!authed) return@launch
+                if (!authed) {
+                    withContext(Dispatchers.Main) {
+                        onError?.invoke("No has iniciado sesión en Spotify")
+                    }
+                    return@launch
+                }
 
-                // If device was discovered via ZeroConf, wake it up locally first
-                SpotifyZeroConfDiscovery.wakeUpDevice(deviceId)
-                delay(300)
+                // 1. Wake up the Echo via local ZeroConf probe
+                SpotifyZeroConfDiscovery.wakeUpDevice(initialDeviceId)
 
+                // 2. Poll Spotify cloud devices to resolve the canonical cloud device ID
+                var targetDeviceId = initialDeviceId
+                var resolvedDevice = device
+
+                for (attempt in 1..4) {
+                    delay(500)
+                    val cloudDevices = Spotify.getAvailableDevices().getOrDefault(emptyList())
+                    val matched = cloudDevices.firstOrNull { cloud ->
+                        cloud.id == initialDeviceId ||
+                        cloud.name.equals(device.name, ignoreCase = true) ||
+                        (device.name.isNotBlank() && cloud.name.contains(device.name, ignoreCase = true)) ||
+                        (cloud.name.isNotBlank() && device.name.contains(cloud.name, ignoreCase = true))
+                    }
+                    if (matched != null && !matched.id.isNullOrBlank()) {
+                        targetDeviceId = matched.id
+                        resolvedDevice = matched
+                        Timber.d("SpotifyConnect: resolved cloud device_id=${matched.id} (${matched.name}) on attempt $attempt")
+                        break
+                    }
+                }
+
+                // 3. Resolve track URI if music is currently playing
                 var trackUri: String? = null
                 if (currentMedia != null) {
                     val registered = SpotifyMetadataRegistry.get(currentMedia.id)
@@ -168,38 +197,55 @@ object SpotifyConnectManager {
                 }
 
                 val finalTrackUri = trackUri
-                Timber.d("SpotifyConnect: transferring playback to device ${device.name} [id=$deviceId]")
+                Timber.d("SpotifyConnect: transferring playback to device ${resolvedDevice.name} [id=$targetDeviceId]")
 
                 // Transfer playback to wake up and activate target device
-                val transferResult = Spotify.transferPlayback(deviceId, play = (finalTrackUri == null))
+                val transferResult = Spotify.transferPlayback(targetDeviceId, play = (finalTrackUri == null))
 
                 val result = if (finalTrackUri != null) {
-                    delay(250)
-                    Timber.d("SpotifyConnect: playing $finalTrackUri on device ${device.name}")
-                    Spotify.playTrackOnDevice(deviceId, finalTrackUri)
+                    delay(300)
+                    Timber.d("SpotifyConnect: playing $finalTrackUri on device ${resolvedDevice.name}")
+                    val playRes = Spotify.playTrackOnDevice(targetDeviceId, finalTrackUri)
+                    if (playRes.isFailure && transferResult.isSuccess) {
+                        // Transfer worked, even if playTrackOnDevice failed
+                        transferResult
+                    } else {
+                        playRes
+                    }
                 } else {
                     transferResult
                 }
 
                 result.fold(
                     onSuccess = {
-                        _connectedDevice.value = device
+                        _connectedDevice.value = resolvedDevice
                         _isConnected.value = true
-                        onLocalPause?.invoke()
-                        Timber.d("SpotifyConnect: successfully connected to ${device.name}")
+                        withContext(Dispatchers.Main) {
+                            onLocalPause?.invoke()
+                            onSuccess?.invoke(resolvedDevice.name)
+                        }
+                        Timber.d("SpotifyConnect: successfully connected to ${resolvedDevice.name}")
                     },
                     onFailure = { err ->
-                        Timber.e(err, "SpotifyConnect: transfer failed")
-                        // If playTrackOnDevice failed, try fallback transferPlayback
-                        if (finalTrackUri != null && transferResult.isSuccess) {
-                            _connectedDevice.value = device
-                            _isConnected.value = true
-                            onLocalPause?.invoke()
+                        Timber.e(err, "SpotifyConnect: transfer failed: ${err.message}")
+                        val errorMsg = when {
+                            err is Spotify.SpotifyException && err.statusCode == 403 ->
+                                "Spotify requiere una cuenta Premium para controlar la reproducción en altavoces"
+                            err is Spotify.SpotifyException && err.statusCode == 404 ->
+                                "El dispositivo no respondió a tiempo. Prueba diciendo «Alexa, conecta Spotify»"
+                            else ->
+                                "No se pudo conectar a ${resolvedDevice.name}: ${err.message ?: "error desconocido"}"
+                        }
+                        withContext(Dispatchers.Main) {
+                            onError?.invoke(errorMsg)
                         }
                     }
                 )
             } catch (e: Exception) {
                 Timber.e(e, "SpotifyConnect: connection error")
+                withContext(Dispatchers.Main) {
+                    onError?.invoke("Error de conexión: ${e.message}")
+                }
             }
         }
     }

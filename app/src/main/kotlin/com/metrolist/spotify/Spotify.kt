@@ -412,7 +412,9 @@ object Spotify {
             val body = buildJsonObject {
                 putJsonArray("uris") { add(trackUri) }
             }.toString()
-            authenticatedPut("me/player/play?device_id=$deviceId", bodyText = body)
+            authenticatedPut("me/player/play", bodyText = body) {
+                parameter("device_id", deviceId)
+            }
             Unit
         }
 
