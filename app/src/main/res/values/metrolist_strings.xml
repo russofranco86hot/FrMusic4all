@@ -1211,4 +1211,17 @@
     <string name="dlna_casting_to">Casting to %s</string>
     <string name="dlna_disconnect">Disconnect</string>
     <string name="dlna_cast_error">Failed to cast to device</string>
+
+    <!-- Cast & Connect -->
+    <string name="connect_to_device">Connect to a device</string>
+    <string name="connect_device_description">Cast to Google Home, Amazon Echo, or local speakers</string>
+    <string name="google_cast_title">Google Cast / Chromecast</string>
+    <string name="google_cast_desc">Google Home, Nest, and Android TV</string>
+    <string name="spotify_connect_title">Spotify Connect</string>
+    <string name="spotify_connect_desc">Amazon Echo, Alexa groups, and smart speakers</string>
+    <string name="spotify_login_to_connect">Log in with Spotify to cast to Amazon Echo and Alexa devices</string>
+    <string name="this_phone">This phone</string>
+    <string name="connected">Connected</string>
+    <string name="playing_on">Playing on %s</string>
+    <string name="collapse">Collapse</string>
 </resources>

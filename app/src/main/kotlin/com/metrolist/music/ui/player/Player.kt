@@ -163,8 +163,6 @@ import com.metrolist.music.extensions.togglePlayPause
 import com.metrolist.music.extensions.toggleRepeatMode
 import com.metrolist.music.listentogether.RoomRole
 import com.metrolist.music.models.MediaMetadata
-import com.metrolist.music.ui.component.CastButton
-import com.metrolist.music.ui.component.DlnaCastButton
 import com.metrolist.music.ui.component.BottomSheet
 import com.metrolist.music.ui.component.BottomSheetState
 import com.metrolist.music.ui.component.LocalBottomSheetPageState
@@ -300,7 +298,7 @@ fun BottomSheetPlayer(
         }
     }
 
-    BackHandler(enabled = state.isExpanded) {
+    BackHandler(enabled = !state.isCollapsed && !state.isDismissed) {
         state.collapseSoft()
     }
 
@@ -1177,12 +1175,6 @@ fun BottomSheetPlayer(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        CastButton(
-                            tintColor = textButtonColor,
-                        )
-                        DlnaCastButton(
-                            tintColor = textButtonColor,
-                        )
                         AnimatedContent(targetState = showInlineLyrics, label = "ShareButton") { showLyrics ->
                             if (showLyrics) {
                                 FilledIconButton(
@@ -1298,14 +1290,6 @@ fun BottomSheetPlayer(
                         }
                     }
                 } else {
-                    CastButton(
-                        tintColor = textButtonColor,
-                    )
-                    Spacer(modifier = Modifier.size(6.dp))
-                    DlnaCastButton(
-                        tintColor = textButtonColor,
-                    )
-                    Spacer(modifier = Modifier.size(6.dp))
                     AnimatedContent(targetState = showInlineLyrics, label = "ShareButton") { showLyrics ->
                         if (showLyrics) {
                             Box(
@@ -1953,6 +1937,7 @@ fun BottomSheetPlayer(
                                     isPlayerExpanded = isExpandedProvider,
                                     isLandscape = true,
                                     isListenTogetherGuest = isListenTogetherGuest,
+                                    onCollapse = { state.collapseSoft() },
                                 )
                             }
                         }
@@ -2015,6 +2000,7 @@ fun BottomSheetPlayer(
                                     modifier = Modifier.nestedScroll(state.preUpPostDownNestedScrollConnection),
                                     isPlayerExpanded = isExpandedProvider,
                                     isListenTogetherGuest = isListenTogetherGuest,
+                                    onCollapse = { state.collapseSoft() },
                                 )
                             }
                         }

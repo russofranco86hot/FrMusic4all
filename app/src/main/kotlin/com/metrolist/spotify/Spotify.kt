@@ -12,6 +12,8 @@ import com.metrolist.spotify.models.SpotifySavedTrack
 import com.metrolist.spotify.models.SpotifySearchResult
 import com.metrolist.spotify.models.SpotifySimpleAlbum
 import com.metrolist.spotify.models.SpotifySimpleArtist
+import com.metrolist.spotify.models.SpotifyDevice
+import com.metrolist.spotify.models.SpotifyDevicesResponse
 import com.metrolist.spotify.models.SpotifyTrack
 import com.metrolist.spotify.models.SpotifyUser
 import io.ktor.client.HttpClient
@@ -23,6 +25,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -347,6 +350,80 @@ object Spotify {
 
         throw SpotifyException(429, "Rate limited after $maxRetries retries")
     }
+
+    private suspend fun authenticatedPut(
+        endpoint: String,
+        bodyText: String? = null,
+        block: io.ktor.client.request.HttpRequestBuilder.() -> Unit = {},
+    ): io.ktor.client.statement.HttpResponse {
+        val token =
+            accessToken ?: throw SpotifyException(401, "Not authenticated").also {
+                log("E", "REST PUT $endpoint — no token")
+            }
+
+        val response =
+            restClient.put(endpoint) {
+                header("Authorization", "Bearer $token")
+                if (bodyText != null) {
+                    setBody(TextContent(bodyText, ContentType.Application.Json))
+                }
+                block()
+            }
+        log("D", "REST PUT $endpoint -> ${response.status.value}")
+
+        if (response.status == HttpStatusCode.Unauthorized) {
+            throw SpotifyException(401, "Token expired or invalid")
+        }
+        if (response.status.value !in 200..299) {
+            val errBody = response.bodyAsText()
+            log("E", "REST PUT $endpoint FAILED: ${response.status.value} — ${errBody.take(200)}")
+            throw SpotifyException(response.status.value, "Spotify API error ${response.status.value}: $errBody")
+        }
+        return response
+    }
+
+    /**
+     * Get available Spotify Connect devices (Amazon Echo, Alexa groups, speakers, etc.)
+     */
+    suspend fun getAvailableDevices(): Result<List<SpotifyDevice>> =
+        runCatching {
+            val response: SpotifyDevicesResponse = authenticatedGet("me/player/devices")
+            response.devices
+        }
+
+    /**
+     * Transfer playback to a Spotify Connect device (Echo, smart speaker, etc.)
+     */
+    suspend fun transferPlayback(deviceId: String, play: Boolean = true): Result<Unit> =
+        runCatching {
+            val body = buildJsonObject {
+                putJsonArray("device_ids") { add(deviceId) }
+                put("play", play)
+            }.toString()
+            authenticatedPut("me/player", bodyText = body)
+            Unit
+        }
+
+    /**
+     * Play a specific track on a Spotify Connect device
+     */
+    suspend fun playTrackOnDevice(deviceId: String, trackUri: String): Result<Unit> =
+        runCatching {
+            val body = buildJsonObject {
+                putJsonArray("uris") { add(trackUri) }
+            }.toString()
+            authenticatedPut("me/player/play?device_id=$deviceId", bodyText = body)
+            Unit
+        }
+
+    /**
+     * Pause playback on active Spotify Connect device
+     */
+    suspend fun pausePlayback(): Result<Unit> =
+        runCatching {
+            authenticatedPut("me/player/pause")
+            Unit
+        }
 
     // ── GQL response converters ──────────────────────────────────────────
 
