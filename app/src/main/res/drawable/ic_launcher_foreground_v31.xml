@@ -1,15 +1,154 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:height="108dp"
     android:width="108dp"
+    android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Subtle AMOLED Circular Glow -->
+    <path
+        android:strokeColor="#22FFFFFF"
+        android:strokeWidth="0.8"
+        android:pathData="M 54,6 A 48,48 0 1,0 54,102 A 48,48 0 1,0 54,6 Z" />
+
+    <!-- 1. SPOTIFY LOGO (Left side, centered around x=34, y=64) -->
+    <!-- Spotify Green Circle (#1ED760) -->
+    <path
+        android:fillColor="#FF1ED760"
+        android:pathData="M 34,48 A 16,16 0 1,0 34,80 A 16,16 0 1,0 34,48 Z" />
+
+    <!-- Spotify Sound Waves (Black) -->
+    <!-- Wave 1 (Top, widest) -->
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M 23.5,60 C 26.5,56 38.5,55.5 43.5,58" />
+
+    <!-- Wave 2 (Middle) -->
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M 25.5,64.2 C 28,61 38,60.5 42,62.8" />
+
+    <!-- Wave 3 (Bottom, shortest) -->
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M 27.5,68.2 C 29.5,65.8 37.5,65.2 40.5,67.2" />
+
+
+    <!-- 2. YOUTUBE MUSIC LOGO (Right side, centered around x=74, y=64) -->
+    <!-- YouTube Music Red Circle (#FF0033) -->
+    <path
+        android:fillColor="#FFFF0033"
+        android:pathData="M 74,48 A 16,16 0 1,0 74,80 A 16,16 0 1,0 74,48 Z" />
+
+    <!-- Concentric White Ring -->
+    <path
+        android:strokeColor="#E6FFFFFF"
+        android:strokeWidth="1.2"
+        android:pathData="M 74,54.5 A 9.5,9.5 0 1,0 74,73.5 A 9.5,9.5 0 1,0 74,54.5 Z" />
+
+    <!-- Center Play Triangle (White) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 71.5,59.5 L 78.5,64 L 71.5,68.5 Z" />
+
+
+    <!-- 3. MUSICAL NOTES (Top & Center Bridge) -->
+    <!-- Beamed Double Eighth Note (♫) in Pure White -->
+    <!-- Left Note Head -->
     <group
-        android:scaleX="2.5"
-        android:scaleY="2.5"
-        android:translateX="24"
-        android:translateY="24">
+        android:translateX="44"
+        android:translateY="41"
+        android:rotation="-25">
         <path
             android:fillColor="#FFFFFFFF"
-            android:pathData="M12,3v10.55c-0.59,-0.34 -1.27,-0.55 -2,-0.55c-2.21,0 -4,1.79 -4,4s1.79,4 4,4s4,-1.79 4,-4V7h4V3H12z"/>
+            android:pathData="M 0,0 A 3.5,2.6 0 1,0 0,5.2 A 3.5,2.6 0 1,0 0,0 Z" />
     </group>
+
+    <!-- Right Note Head -->
+    <group
+        android:translateX="62"
+        android:translateY="37"
+        android:rotation="-25">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 0,0 A 3.5,2.6 0 1,0 0,5.2 A 3.5,2.6 0 1,0 0,0 Z" />
+    </group>
+
+    <!-- Left Stem -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:pathData="M 48.5,39.5 L 48.5,20.5" />
+
+    <!-- Right Stem -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:pathData="M 66.5,35.5 L 66.5,16.5" />
+
+    <!-- Top Connecting Beam -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 47.8,20.8 L 67.2,16.8 L 67.2,20.8 L 47.8,24.8 Z" />
+
+    <!-- Floating Green Musical Note (Top Left) -->
+    <group
+        android:translateX="25"
+        android:translateY="35"
+        android:rotation="-20">
+        <path
+            android:fillColor="#FF1ED760"
+            android:pathData="M 0,0 A 2.2,1.6 0 1,0 0,3.2 A 2.2,1.6 0 1,0 0,0 Z" />
+    </group>
+    <path
+        android:strokeColor="#FF1ED760"
+        android:strokeWidth="0.9"
+        android:strokeLineCap="round"
+        android:pathData="M 27.2,34.2 L 27.2,24 C 27.2,24 29.5,23.5 30.5,25.5" />
+
+    <!-- Floating Red Musical Note (Top Right) -->
+    <group
+        android:translateX="81"
+        android:translateY="35"
+        android:rotation="-20">
+        <path
+            android:fillColor="#FFFF3C5A"
+            android:pathData="M 0,0 A 2.2,1.6 0 1,0 0,3.2 A 2.2,1.6 0 1,0 0,0 Z" />
+    </group>
+    <path
+        android:strokeColor="#FFFF3C5A"
+        android:strokeWidth="0.9"
+        android:strokeLineCap="round"
+        android:pathData="M 83.2,34.2 L 83.2,24 C 83.2,24 85.5,23.5 86.5,25.5" />
+
+
+    <!-- 4. EQUALIZER SPECTRUM BARS (Center Bridge) -->
+    <!-- Left bar (Spotify Green) -->
+    <path
+        android:strokeColor="#DD1ED760"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M 51,60 L 51,68" />
+
+    <!-- Center bar (Pure White) -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M 54,58 L 54,70" />
+
+    <!-- Right bar (YouTube Red) -->
+    <path
+        android:strokeColor="#DDFF0033"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M 57,60 L 57,68" />
+
 </vector>
