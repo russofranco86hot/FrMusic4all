@@ -57,14 +57,39 @@ data class RadioStation(
     fun toMediaItem(): MediaItem {
         val stream = streamUrl
         val isHls = stream.contains(".m3u8", ignoreCase = true) || stream.contains("hls", ignoreCase = true)
-        val baseItem = toMediaMetadata().toMediaItem()
-        return baseItem.buildUpon()
+        val metadata = toMediaMetadata()
+        val artistNames = metadata.artists.joinToString { it.name }
+
+        return MediaItem.Builder()
+            .setMediaId(metadata.id)
             .setUri(stream)
+            .setCustomCacheKey(null)
+            .setLiveConfiguration(
+                MediaItem.LiveConfiguration.Builder()
+                    .setMaxPlaybackSpeed(1.02f)
+                    .setMinPlaybackSpeed(0.98f)
+                    .build()
+            )
             .apply {
                 if (isHls) {
                     setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
                 }
             }
+            .setTag(metadata)
+            .setMediaMetadata(
+                androidx.media3.common.MediaMetadata.Builder()
+                    .setTitle(metadata.title)
+                    .setSubtitle(artistNames)
+                    .setArtist(artistNames)
+                    .setArtworkUri(metadata.thumbnailUrl?.let { android.net.Uri.parse(it) })
+                    .setAlbumTitle(metadata.album?.title)
+                    .setAlbumArtist(artistNames)
+                    .setDisplayTitle(metadata.title)
+                    .setMediaType(androidx.media3.common.MediaMetadata.MEDIA_TYPE_RADIO_STATION)
+                    .setIsBrowsable(false)
+                    .setIsPlayable(true)
+                    .build()
+            )
             .build()
     }
 }

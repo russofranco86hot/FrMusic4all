@@ -138,7 +138,8 @@ fun RadioScreen(
             playerConnection?.playQueue(
                 ListQueue(
                     title = station.name,
-                    items = listOf(station.toMediaItem())
+                    items = listOf(station.toMediaItem()),
+                    position = androidx.media3.common.C.TIME_UNSET,
                 )
             )
         }

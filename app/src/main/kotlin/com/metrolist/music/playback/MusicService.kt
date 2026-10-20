@@ -60,6 +60,7 @@ import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
+import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.cache.Cache
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR
@@ -743,6 +744,19 @@ class MusicService :
 
         playerInitialized.value = true
         Timber.tag(TAG).d("Player successfully initialized")
+
+        scope.launch(Dispatchers.IO) {
+            runCatching {
+                playerCache.keys.filter { key ->
+                    key.startsWith("radio:") ||
+                    key.contains(".m3u8", ignoreCase = true) ||
+                    key.contains("hls", ignoreCase = true) ||
+                    key.contains("latinatvhls", ignoreCase = true)
+                }.forEach {
+                    playerCache.removeResource(it)
+                }
+            }
+        }
 
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         setupAudioFocusRequest()
@@ -1989,10 +2003,16 @@ class MusicService :
                     ),
                 )
             } else {
+                val isRadio = initialStatus.items.getOrNull(initialStatus.mediaItemIndex)?.mediaId?.startsWith("radio:") == true
+                val startPosition = if (isRadio) {
+                    androidx.media3.common.C.TIME_UNSET
+                } else {
+                    initialStatus.position
+                }
                 player.setMediaItems(
                     initialStatus.items,
                     if (initialStatus.mediaItemIndex > 0) initialStatus.mediaItemIndex else 0,
-                    initialStatus.position,
+                    startPosition,
                 )
                 player.prepare()
                 player.playWhenReady = playWhenReady
@@ -2889,6 +2909,16 @@ class MusicService :
         updateInitialBufferRecovery(playbackState)
 
         if (playbackState == Player.STATE_ENDED) {
+            val isRadio = player.currentMediaItem?.mediaId?.startsWith("radio:") == true
+            if (isRadio) {
+                if (player.playWhenReady) {
+                    player.seekToDefaultPosition()
+                    player.prepare()
+                    player.play()
+                }
+                return
+            }
+
             player.currentMediaItem?.mediaId?.let { mediaId ->
                 scope.launch(Dispatchers.IO) { markCachedIfFullyDownloaded(mediaId) }
             }
@@ -2993,6 +3023,7 @@ class MusicService :
                 player.playWhenReady &&
                 player.currentPosition < INITIAL_BUFFER_RECOVERY_POSITION_MS &&
                 mediaId != null &&
+                !mediaId.startsWith("radio:") &&
                 initialBufferRecoveryAttemptedMediaId != mediaId
 
         if (!shouldWatch) {
@@ -4500,24 +4531,108 @@ class MusicService :
         )
     }
 
+    private fun createDirectDataSourceFactory(): DataSource.Factory =
+        DefaultDataSource.Factory(
+            this,
+            OkHttpDataSource.Factory(
+                OkHttpClient
+                    .Builder()
+                    .proxy(YouTube.proxy)
+                    .proxyAuthenticator { _, response ->
+                        YouTube.proxyAuth?.let { auth ->
+                            response.request
+                                .newBuilder()
+                                .header("Proxy-Authorization", auth)
+                                .build()
+                        } ?: response.request
+                    }.build(),
+            ),
+        )
+
+    private class SelectiveDataSource(
+        private val cacheDataSource: DataSource,
+        private val directDataSource: DataSource,
+        private val playerProvider: () -> ExoPlayer?,
+    ) : DataSource {
+        private var activeDataSource: DataSource = cacheDataSource
+
+        override fun addTransferListener(transferListener: TransferListener) {
+            cacheDataSource.addTransferListener(transferListener)
+            directDataSource.addTransferListener(transferListener)
+        }
+
+        override fun open(dataSpec: DataSpec): Long {
+            val uriStr = dataSpec.uri.toString()
+            val currentMediaId = playerProvider()?.currentMediaItem?.mediaId
+            val isLiveOrRadio = currentMediaId?.startsWith("radio:") == true ||
+                dataSpec.key?.startsWith("radio:") == true ||
+                uriStr.startsWith("radio:") ||
+                uriStr.contains(".m3u8", ignoreCase = true) ||
+                uriStr.contains("/hls/", ignoreCase = true) ||
+                uriStr.contains("hls", ignoreCase = true) ||
+                uriStr.contains(".ts", ignoreCase = true) ||
+                dataSpec.isFlagSet(DataSpec.FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN)
+
+            activeDataSource = if (isLiveOrRadio) directDataSource else cacheDataSource
+            return activeDataSource.open(dataSpec)
+        }
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
+            activeDataSource.read(buffer, offset, length)
+
+        override fun getUri(): android.net.Uri? = activeDataSource.uri
+
+        override fun getResponseHeaders(): Map<String, List<String>> =
+            activeDataSource.responseHeaders
+
+        override fun close() {
+            activeDataSource.close()
+        }
+    }
+
     private fun createDataSourceFactory(
         normalizationProcessor: VolumeNormalizationAudioProcessor,
         playerProvider: () -> ExoPlayer?,
     ): DataSource.Factory {
-        return ResolvingDataSource.Factory(createCacheDataSource()) { dataSpec ->
+        val cacheFactory = createCacheDataSource()
+        val directFactory = createDirectDataSourceFactory()
+        val selectiveFactory = DataSource.Factory {
+            SelectiveDataSource(
+                cacheDataSource = cacheFactory.createDataSource(),
+                directDataSource = directFactory.createDataSource(),
+                playerProvider = playerProvider,
+            )
+        }
+
+        return ResolvingDataSource.Factory(selectiveFactory) { dataSpec ->
+            val uriString = dataSpec.uri.toString()
+
+            // 1. Direct HTTP/HTTPS audio or HLS segment/playlist
+            // CRITICAL: NEVER overwrite or redirect sub-resources (like .ts chunks or media playlists)
+            if (uriString.startsWith("http://") || uriString.startsWith("https://")) {
+                return@Factory if (dataSpec.key?.startsWith("radio:") == true) {
+                    dataSpec.buildUpon().setKey(null).build()
+                } else {
+                    dataSpec
+                }
+            }
+
+            // 2. Radio stream URI scheme (radio:https://...)
+            if (uriString.startsWith("radio:") || dataSpec.key?.startsWith("radio:") == true) {
+                val radioUrl = if (uriString.startsWith("radio:")) {
+                    uriString.removePrefix("radio:")
+                } else {
+                    dataSpec.key!!.removePrefix("radio:")
+                }
+                return@Factory dataSpec.buildUpon()
+                    .setUri(radioUrl.toUri())
+                    .setKey(null)
+                    .setFlags(dataSpec.flags or DataSpec.FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN)
+                    .build()
+            }
+
             val rawKey = dataSpec.key ?: dataSpec.uri.toString()
             val mediaId = stripQobuzCacheKeyPrefix(rawKey)
-
-            // Direct HTTP/HTTPS audio or HLS segment
-            if (mediaId.startsWith("http://") || mediaId.startsWith("https://")) {
-                return@Factory dataSpec.withUri(mediaId.toUri())
-            }
-
-            // Radio stream URI
-            if (mediaId.startsWith("radio:")) {
-                val radioUrl = mediaId.removePrefix("radio:")
-                return@Factory dataSpec.withUri(radioUrl.toUri())
-            }
 
             // Handle local audio files — resolve to content URI and bypass YouTube fetch
             if (mediaId.startsWith("local:")) {
