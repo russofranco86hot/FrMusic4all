@@ -4571,8 +4571,10 @@ class MusicService :
             val uriStr = dataSpec.uri.toString()
             val isDirect = isCurrentRadioProvider() ||
                 dataSpec.key?.startsWith("radio:") == true ||
+                dataSpec.key?.startsWith("tv:") == true ||
                 dataSpec.key?.startsWith("local:") == true ||
                 uriStr.startsWith("radio:") ||
+                uriStr.startsWith("tv:") ||
                 uriStr.startsWith("content:") ||
                 uriStr.startsWith("file:") ||
                 uriStr.contains(".m3u8", ignoreCase = true) ||
@@ -4625,15 +4627,17 @@ class MusicService :
                 }
             }
 
-            // 2. Radio stream URI scheme (radio:https://...)
-            if (uriString.startsWith("radio:") || dataSpec.key?.startsWith("radio:") == true) {
-                val radioUrl = if (uriString.startsWith("radio:")) {
-                    uriString.removePrefix("radio:")
-                } else {
-                    dataSpec.key!!.removePrefix("radio:")
+            // 2. Radio or TV stream URI scheme (radio:https://... or tv:https://...)
+            if (uriString.startsWith("radio:") || dataSpec.key?.startsWith("radio:") == true ||
+                uriString.startsWith("tv:") || dataSpec.key?.startsWith("tv:") == true) {
+                val streamUrl = when {
+                    uriString.startsWith("radio:") -> uriString.removePrefix("radio:")
+                    uriString.startsWith("tv:") -> uriString.removePrefix("tv:")
+                    dataSpec.key?.startsWith("radio:") == true -> dataSpec.key!!.removePrefix("radio:")
+                    else -> dataSpec.key!!.removePrefix("tv:")
                 }
                 return@Factory dataSpec.buildUpon()
-                    .setUri(radioUrl.toUri())
+                    .setUri(streamUrl.toUri())
                     .setKey(null)
                     .setFlags(dataSpec.flags or DataSpec.FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN)
                     .build()

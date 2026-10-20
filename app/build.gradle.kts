@@ -40,8 +40,8 @@ android {
         applicationId = applicationIdOverride ?: "com.frmusic4all.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 30
-        versionName = "1.2.5"
+        versionCode = 31
+        versionName = "1.2.6"
         val baseVersionName = requireNotNull(versionName)
         buildConfigField("String", "BASE_VERSION_NAME", "\"$baseVersionName\"")
         buildCommit?.let { versionName = "$baseVersionName+$it" }
@@ -299,6 +299,7 @@ dependencies {
     implementation(libs.media3)
     implementation(libs.media3.hls)
     implementation(libs.media3.session)
+    implementation(libs.media3.ui)
     implementation(libs.media3.okhttp)
 
     // Google Cast - only included in GMS flavor (not available in F-Droid/FOSS builds)

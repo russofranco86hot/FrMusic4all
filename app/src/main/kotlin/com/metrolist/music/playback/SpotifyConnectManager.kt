@@ -116,16 +116,17 @@ object SpotifyConnectManager {
         scope.launch {
             _isScanning.value = true
             try {
+                // 1. Always start local mDNS ZeroConf discovery for Echo / Alexa devices on Wi-Fi
+                targetContext?.let {
+                    SpotifyZeroConfDiscovery.startDiscovery(it)
+                }
+
                 val authed = SpotifyTokenManager.ensureAuthenticated()
                 _isLoggedIn.value = authed
                 if (!authed) {
-                    _availableDevices.value = emptyList()
+                    val localDevices = SpotifyZeroConfDiscovery.discoveredDevices.value.values.map { it.device }
+                    mergeAndPublishDevices(emptyList(), localDevices)
                     return@launch
-                }
-
-                // 1. Start local mDNS ZeroConf discovery for Echo / Alexa devices
-                targetContext?.let {
-                    SpotifyZeroConfDiscovery.startDiscovery(it)
                 }
 
                 // 2. Fetch cloud-registered devices from Spotify API

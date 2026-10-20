@@ -647,10 +647,13 @@ fun ExperimentalLyrics(
             modifier = Modifier.zIndex(1f).padding(top = 56.dp)
         )
 
-        if (lyrics == LYRICS_NOT_FOUND) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = stringResource(R.string.lyrics_not_found), fontSize = 20.sp, color = MaterialTheme.colorScheme.secondary, modifier = Modifier.alpha(0.5f))
-            }
+        val isRadioOrLive = mediaMetadata?.id?.startsWith("radio:") == true || mediaMetadata?.id?.startsWith("tv:") == true
+
+        if (lyrics == LYRICS_NOT_FOUND || isRadioOrLive) {
+            LiveSpeechTranscriberView(
+                modifier = Modifier.fillMaxSize().padding(top = 56.dp),
+                isRadioOrLive = isRadioOrLive,
+            )
         } else if (lyrics == null && (translationStatus is LyricsTranslationHelper.TranslationStatus.Idle || translationStatus is LyricsTranslationHelper.TranslationStatus.Error)) {
              Column(modifier = Modifier.padding(top = 100.dp)) {
                  ShimmerHost { repeat(10) { Box(contentAlignment = when (lyricsTextPosition) {

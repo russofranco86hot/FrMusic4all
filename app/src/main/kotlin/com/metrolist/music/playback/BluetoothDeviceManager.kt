@@ -24,8 +24,10 @@ data class ConnectedAudioDevice(
     val name: String,
     val typeDescription: String,
     val isWatch: Boolean,
-    val isBluetooth: Boolean,
-    val isCurrentOutput: Boolean,
+    val isEcho: Boolean = false,
+    val isBluetooth: Boolean = true,
+    val isCurrentOutput: Boolean = false,
+    val isConnected: Boolean = true,
 )
 
 object BluetoothDeviceManager {
@@ -104,10 +106,54 @@ object BluetoothDeviceManager {
                         name = displayName,
                         typeDescription = typeDesc,
                         isWatch = isWatch,
+                        isEcho = isEcho,
                         isBluetooth = true,
                         isCurrentOutput = false,
+                        isConnected = true,
                     )
                 )
+            }
+
+            // Also inspect bonded (paired) Bluetooth devices for Amazon Echo or Smartwatches in standby
+            try {
+                val btAdapter = BluetoothAdapter.getDefaultAdapter()
+                val bonded = btAdapter?.bondedDevices
+                if (bonded != null) {
+                    for (btDev in bonded) {
+                        val name = btDev.name.orEmpty()
+                        if (name.isBlank()) continue
+
+                        val isEcho = name.contains("Echo", ignoreCase = true) ||
+                                name.contains("Alexa", ignoreCase = true) ||
+                                name.contains("Dot", ignoreCase = true) ||
+                                name.contains("Show", ignoreCase = true) ||
+                                name.contains("Pop", ignoreCase = true)
+
+                        val isWatch = name.contains("Watch", ignoreCase = true) ||
+                                name.contains("Gear", ignoreCase = true) ||
+                                name.contains("Reloj", ignoreCase = true)
+
+                        if (!isEcho && !isWatch) continue
+
+                        // Check if already in deviceList
+                        if (deviceList.none { it.name.equals(name, ignoreCase = true) }) {
+                            deviceList.add(
+                                ConnectedAudioDevice(
+                                    id = btDev.address.hashCode(),
+                                    name = name,
+                                    typeDescription = if (isEcho) "Amazon Echo (En reposo - Toca para conectar)" else "Smartwatch (En reposo)",
+                                    isWatch = isWatch,
+                                    isEcho = isEcho,
+                                    isBluetooth = true,
+                                    isCurrentOutput = false,
+                                    isConnected = false,
+                                )
+                            )
+                        }
+                    }
+                }
+            } catch (e: SecurityException) {
+                Timber.w(e, "BluetoothDeviceManager: missing BLUETOOTH_CONNECT permission to list bonded devices")
             }
         } catch (e: Exception) {
             Timber.e(e, "BluetoothDeviceManager: error enumerating audio devices")

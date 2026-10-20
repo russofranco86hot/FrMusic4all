@@ -779,8 +779,9 @@ class MainActivity : FragmentActivity() {
                     remember {
                         listOf(
                             Screens.Home.route,
+                            Screens.Radio.route,
+                            Screens.TvStreaming.route,
                             Screens.Library.route,
-                            Screens.ListenTogether.route,
                             "settings",
                         )
                     }
@@ -1020,8 +1021,9 @@ class MainActivity : FragmentActivity() {
                         when (navBackStackEntry?.destination?.route) {
                             Screens.Home.route -> R.string.home
                             Screens.Search.route -> R.string.search
+                            Screens.Radio.route -> R.string.radio
+                            Screens.TvStreaming.route -> R.string.tv_streaming
                             Screens.Library.route -> R.string.filter_library
-                            Screens.ListenTogether.route -> R.string.together
                             else -> null
                         }
                     }

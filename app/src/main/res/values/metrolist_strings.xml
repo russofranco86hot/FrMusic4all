@@ -1253,4 +1253,32 @@
     <string name="bluetooth_and_watch_desc">Galaxy Watch, Wear OS, Amazon Echo BT &amp; speakers</string>
     <string name="open_system_output_switcher">Switch audio output (Watch / Bluetooth)</string>
     <string name="echo_bluetooth_hint">To stream Radio and all audio to Amazon Echo or your Watch, connect via Bluetooth by saying “Alexa, connect my phone”.</string>
+
+    <!-- Amazon Echo & Alexa -->
+    <string name="amazon_echo_title">Amazon Echo / Alexa</string>
+    <string name="amazon_echo_desc">Echo Pop, Echo Dot, Echo Show &amp; Alexa devices</string>
+    <string name="connect_echo_bt_instruction">To stream live Radio, TV or Local audio to your Echo: 1. Say “Alexa, connect my phone”. 2. Tap below to connect.</string>
+    <string name="echo_standby_hint">Echo detected on network. If in standby, wake it with “Alexa, Spotify Connect” or “Alexa, connect my phone”.</string>
+
+    <!-- TV & Streaming -->
+    <string name="tv_streaming">TV</string>
+    <string name="tv_streaming_title">TV &amp; Streaming</string>
+    <string name="tv_streaming_desc">Luzu TV, Olga, Blender, Gelatina, News &amp; Live Channels</string>
+    <string name="tv_tab_all">All</string>
+    <string name="tv_tab_streaming">Streaming</string>
+    <string name="tv_tab_news">News &amp; Air</string>
+    <string name="tv_tab_favorites">Favorites</string>
+    <string name="tv_video_mode">Video</string>
+    <string name="tv_audio_only_mode">Audio only</string>
+    <string name="tv_audio_only_active">Audio-only mode (battery saver)</string>
+    <string name="tv_channel_offline">Channel is not broadcasting live right now</string>
+    <string name="tv_search_hint">Search channels (Luzu, Olga, TN, C5N…)…</string>
+
+    <!-- Live Speech Recognition / Transcriber -->
+    <string name="live_transcription_title">Live Voice Recognition</string>
+    <string name="live_transcription_desc">Transcribe spoken words in real time</string>
+    <string name="live_transcription_listening">Listening and transcribing live…</string>
+    <string name="live_transcription_permission_needed">Microphone permission is needed to transcribe live audio</string>
+    <string name="live_transcription_start">Start Live Transcription</string>
+    <string name="live_transcription_stop">Stop Transcription</string>
 </resources>

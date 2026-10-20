@@ -31,8 +31,56 @@ private val BACKGROUND_REGEX = "^\\{bg\\}".toRegex()
 
 @Suppress("RegExpRedundantEscape")
 object LyricsUtils {
+    private val NOISE_REGEX = Regex(
+        "(?i)\\b(official\\s*(music)?\\s*video|video\\s*oficial|audio\\s*oficial|lyric\\s*video|video\\s*con\\s*letra|letra|lyrics|videoclip|clip\\s*oficial|4k|hd|remastered|remaster|en\\s*vivo|live|acustico|acoustic)\\b"
+    )
+
     fun cleanTitleForSearch(title: String): String {
-        return title.replace(Regex("\\s*[(\\[].*?[)\\]]"), "").trim()
+        return title
+            .replace(Regex("\\s*[(\\[].*?[)\\]]"), "")
+            .replace(NOISE_REGEX, "")
+            .trim()
+    }
+
+    fun extractArtistAndTitle(rawTitle: String, fallbackArtist: String): Pair<String, String> {
+        var cleanTitle = cleanTitleForSearch(rawTitle)
+        var cleanArtist = fallbackArtist
+            .replace(Regex("(?i)VEVO$"), "")
+            .replace(Regex("(?i)\\s*-\\s*Topic$"), "")
+            .trim()
+
+        if (cleanTitle.contains(" - ")) {
+            val parts = cleanTitle.split(" - ", limit = 2)
+            val potentialArtist = parts[0].trim()
+            val potentialTitle = parts[1].trim()
+
+            if (potentialArtist.isNotBlank() && potentialTitle.isNotBlank()) {
+                cleanArtist = potentialArtist
+                cleanTitle = potentialTitle
+            }
+        }
+
+        return Pair(cleanArtist.ifBlank { fallbackArtist }, cleanTitle.ifBlank { rawTitle })
+    }
+
+    fun hasPredominantlyCjk(text: String): Boolean {
+        var cjkCount = 0
+        var latinCount = 0
+        for (char in text) {
+            val block = java.lang.Character.UnicodeBlock.of(char)
+            if (block == java.lang.Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS ||
+                block == java.lang.Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A ||
+                block == java.lang.Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS ||
+                block == java.lang.Character.UnicodeBlock.HIRAGANA ||
+                block == java.lang.Character.UnicodeBlock.KATAKANA ||
+                block == java.lang.Character.UnicodeBlock.HANGUL_SYLLABLES
+            ) {
+                cjkCount++
+            } else if (char in 'a'..'z' || char in 'A'..'Z' || char in 'á'..'ú' || char in 'Á'..'Ú' || char == 'ñ' || char == 'Ñ') {
+                latinCount++
+            }
+        }
+        return cjkCount > 10 && cjkCount > latinCount
     }
 
     fun filterLyricsCreditLines(lyrics: String): String {

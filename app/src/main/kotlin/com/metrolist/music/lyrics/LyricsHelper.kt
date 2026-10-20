@@ -77,10 +77,13 @@ constructor(
         var unsyncedFallback: LyricsWithProvider? = null
 
         val result = withTimeoutOrNull(MAX_LYRICS_FETCH_MS) {
-            val cleanedTitle = LyricsUtils.cleanTitleForSearch(mediaMetadata.title)
+            val (resolvedArtist, resolvedTitle) = LyricsUtils.extractArtistAndTitle(
+                rawTitle = mediaMetadata.title,
+                fallbackArtist = mediaMetadata.artists.joinToString { it.name }
+            )
             val enabledProviders = orderedProviders.filter { it.isEnabled(context) }
 
-            Timber.tag("LyricsHelper").d("Starting sequential fetch for: $cleanedTitle by ${mediaMetadata.artists.joinToString { it.name }}")
+            Timber.tag("LyricsHelper").d("Starting sequential fetch for: $resolvedTitle by $resolvedArtist")
             Timber.tag("LyricsHelper").d("Enabled providers in order: ${enabledProviders.joinToString { it.name }}")
 
             for (provider in enabledProviders) {
@@ -90,8 +93,8 @@ constructor(
                         provider.getLyrics(
                             context,
                             mediaMetadata.id,
-                            cleanedTitle,
-                            mediaMetadata.artists.joinToString { it.name },
+                            resolvedTitle,
+                            resolvedArtist,
                             mediaMetadata.duration,
                             mediaMetadata.album?.title,
                         )
@@ -104,7 +107,17 @@ constructor(
                 }
 
                 if (providerResult != null && providerResult.isSuccess) {
-                    val filtered = LyricsUtils.filterLyricsCreditLines(providerResult.getOrNull()!!)
+                    val rawLyrics = providerResult.getOrNull()!!
+                    val filtered = LyricsUtils.filterLyricsCreditLines(rawLyrics)
+
+                    // Language check: discard CJK (Chinese/Japanese/Korean) lyrics for Western/Latin songs
+                    val titleIsLatin = !LyricsUtils.hasPredominantlyCjk(mediaMetadata.title)
+                    val lyricsIsCjk = LyricsUtils.hasPredominantlyCjk(filtered)
+                    if (titleIsLatin && lyricsIsCjk) {
+                        Timber.tag("LyricsHelper").w("Rejected CJK lyrics from ${provider.name} for Latin song ${mediaMetadata.title}")
+                        continue
+                    }
+
                     // Plain text from an earlier provider used to win outright, so a song whose
                     // lyrics are time-synced further down the list (YouTube's own subtitles, say)
                     // was shown as a static block. Keep the first plain hit as a fallback but carry
@@ -160,7 +173,7 @@ constructor(
 
         val allResult = mutableListOf<LyricsResult>()
         currentLyricsJob = CoroutineScope(SupervisorJob()).launch {
-            val cleanedTitle = LyricsUtils.cleanTitleForSearch(songTitle)
+            val (resolvedArtist, resolvedTitle) = LyricsUtils.extractArtistAndTitle(songTitle, songArtists)
             val allProviders = context.dataStore.data
                 .map { preferences -> resolveLyricsProviders(preferences) }
                 .first()
@@ -174,8 +187,13 @@ constructor(
             val otherJobs = otherProviders.map { provider ->
                 launch {
                     try {
-                        provider.getAllLyrics(context, mediaId, cleanedTitle, songArtists, duration, album) { lyrics ->
+                        provider.getAllLyrics(context, mediaId, resolvedTitle, resolvedArtist, duration, album) { lyrics ->
                             val filteredLyrics = LyricsUtils.filterLyricsCreditLines(lyrics)
+                            val titleIsLatin = !LyricsUtils.hasPredominantlyCjk(songTitle)
+                            val lyricsIsCjk = LyricsUtils.hasPredominantlyCjk(filteredLyrics)
+                            if (titleIsLatin && lyricsIsCjk) {
+                                return@getAllLyrics
+                            }
                             val result = LyricsResult(provider.name, filteredLyrics)
                             synchronized(callbackMutex) {
                                 allResult += result
@@ -195,7 +213,7 @@ constructor(
             if (lyricsPlusProvider != null && otherLyricsCount <= 2) {
                 launch {
                     try {
-                        lyricsPlusProvider.getAllLyrics(context, mediaId, cleanedTitle, songArtists, duration, album) { lyrics ->
+                        lyricsPlusProvider.getAllLyrics(context, mediaId, resolvedTitle, resolvedArtist, duration, album) { lyrics ->
                             val filteredLyrics = LyricsUtils.filterLyricsCreditLines(lyrics)
                             val result = LyricsResult(lyricsPlusProvider.name, filteredLyrics)
                             synchronized(callbackMutex) {

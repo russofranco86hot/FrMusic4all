@@ -52,7 +52,14 @@ sealed class Screens(
         route = "radio"
     )
 
+    object TvStreaming : Screens(
+        titleId = R.string.tv_streaming,
+        iconIdInactive = R.drawable.ic_tv,
+        iconIdActive = R.drawable.ic_tv,
+        route = "tv_streaming"
+    )
+
     companion object {
-        val MainScreens = listOf(Home, Search, Radio, Library)
+        val MainScreens = listOf(Home, Search, Radio, TvStreaming, Library)
     }
 }

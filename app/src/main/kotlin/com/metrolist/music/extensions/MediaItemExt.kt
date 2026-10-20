@@ -35,15 +35,21 @@ fun MediaMetadata.toMediaItem(): MediaItem {
     val resolvedMetadata = withResolvedArtistNameAliases()
     val artistNames = resolvedMetadata.artists.joinToString { it.name }
     val isRadio = resolvedMetadata.id.startsWith("radio:")
-    val streamUri = if (isRadio) resolvedMetadata.id.removePrefix("radio:") else resolvedMetadata.id
-    val isHls = isRadio && (streamUri.contains(".m3u8", ignoreCase = true) || streamUri.contains("hls", ignoreCase = true))
+    val isTv = resolvedMetadata.id.startsWith("tv:")
+    val isLive = isRadio || isTv
+    val streamUri = when {
+        isRadio -> resolvedMetadata.id.removePrefix("radio:")
+        isTv -> resolvedMetadata.id.removePrefix("tv:")
+        else -> resolvedMetadata.id
+    }
+    val isHls = isLive && (streamUri.contains(".m3u8", ignoreCase = true) || streamUri.contains("hls", ignoreCase = true))
 
     return MediaItem.Builder()
         .setMediaId(resolvedMetadata.id)
         .setUri(streamUri)
-        .setCustomCacheKey(if (isRadio) null else resolvedMetadata.id)
+        .setCustomCacheKey(if (isLive) null else resolvedMetadata.id)
         .apply {
-            if (isRadio) {
+            if (isLive) {
                 setLiveConfiguration(
                     MediaItem.LiveConfiguration.Builder()
                         .setMaxPlaybackSpeed(1.02f)

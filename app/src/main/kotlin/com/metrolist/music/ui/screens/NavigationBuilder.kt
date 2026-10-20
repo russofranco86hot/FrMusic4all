@@ -106,6 +106,10 @@ fun NavGraphBuilder.navigationBuilder(
         RadioScreen()
     }
 
+    composable(Screens.TvStreaming.route) {
+        com.metrolist.music.ui.screens.tv.TvStreamingScreen()
+    }
+
     composable(Screens.Library.route) {
         LibraryScreen()
     }

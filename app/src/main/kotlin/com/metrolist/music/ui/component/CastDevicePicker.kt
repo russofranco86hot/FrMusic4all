@@ -250,11 +250,11 @@ fun CastDevicePicker(
                     }
                 }
 
-                // Spotify Connect section (Amazon Echo, Alexa groups, etc.)
+                // Amazon Echo & Spotify Connect section
                 item {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     Text(
-                        text = stringResource(R.string.spotify_connect_title),
+                        text = stringResource(R.string.amazon_echo_title),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -262,24 +262,7 @@ fun CastDevicePicker(
                     )
                 }
 
-                if (!isSpotifyLoggedIn) {
-                    item {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.spotify_login_to_connect),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(12.dp),
-                            )
-                        }
-                    }
-                } else if (spotifyDevices.isEmpty() && !isSpotifyScanning) {
+                if (spotifyDevices.isEmpty() && !isSpotifyScanning) {
                     item {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
@@ -289,7 +272,7 @@ fun CastDevicePicker(
                                 .padding(vertical = 4.dp),
                         ) {
                             Text(
-                                text = stringResource(R.string.spotify_connect_echo_hint),
+                                text = stringResource(R.string.echo_standby_hint),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(12.dp),
@@ -307,38 +290,52 @@ fun CastDevicePicker(
                             subtitle = typeDesc,
                             isActive = isCurrentActive || device.isActive,
                             onClick = {
-                                Toast.makeText(
-                                    context,
-                                    "Conectando a ${device.name}…",
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                                onDismissRequest()
-                                SpotifyConnectManager.connectToDevice(
-                                    device = device,
-                                    currentMedia = mediaMetadata,
-                                    onLocalPause = { playerConnection.player.pause() },
-                                    onSuccess = { name ->
-                                        Toast.makeText(
-                                            context,
-                                            context.getString(R.string.playing_on, name),
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                    },
-                                    onError = { error ->
-                                        Toast.makeText(
-                                            context,
-                                            error,
-                                            Toast.LENGTH_LONG,
-                                        ).show()
-                                    },
-                                )
+                                val isNonSpotifyMedia = mediaMetadata?.id?.startsWith("radio:") == true ||
+                                        mediaMetadata?.id?.startsWith("tv:") == true ||
+                                        mediaMetadata?.id?.startsWith("local:") == true
+
+                                if (isNonSpotifyMedia || !isSpotifyLoggedIn) {
+                                    Toast.makeText(
+                                        context,
+                                        "Para reproducir en tu Echo, di «Alexa, conecta mi teléfono»",
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                    BluetoothDeviceManager.openMediaOutputPanel(context)
+                                    onDismissRequest()
+                                } else {
+                                    Toast.makeText(
+                                        context,
+                                        "Conectando a ${device.name}…",
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                    onDismissRequest()
+                                    SpotifyConnectManager.connectToDevice(
+                                        device = device,
+                                        currentMedia = mediaMetadata,
+                                        onLocalPause = { playerConnection.player.pause() },
+                                        onSuccess = { name ->
+                                            Toast.makeText(
+                                                context,
+                                                context.getString(R.string.playing_on, name),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        },
+                                        onError = { error ->
+                                            Toast.makeText(
+                                                context,
+                                                error,
+                                                Toast.LENGTH_LONG,
+                                            ).show()
+                                        },
+                                    )
+                                }
                             },
                         )
                     }
 
                     item {
                         Text(
-                            text = stringResource(R.string.spotify_connect_echo_hint),
+                            text = stringResource(R.string.connect_echo_bt_instruction),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
@@ -536,14 +533,14 @@ private fun DeviceItemRow(
 
 private fun getSpotifyDeviceDisplay(device: SpotifyDevice): Pair<Int, String> {
     val lowerName = device.name.lowercase()
-    val isEcho = lowerName.contains("echo") || lowerName.contains("alexa") || lowerName.contains("dot")
+    val isEcho = lowerName.contains("echo") || lowerName.contains("alexa") || lowerName.contains("dot") || lowerName.contains("pop") || lowerName.contains("show")
 
     return when {
-        isEcho -> Pair(R.drawable.volume_up, "Amazon Echo • Alexa")
+        isEcho -> Pair(R.drawable.ic_echo, "Amazon Echo • Alexa")
         device.type.equals("CastGroup", ignoreCase = true) -> Pair(R.drawable.group, "Speaker Group (Multi-Room)")
         device.type.equals("Computer", ignoreCase = true) -> Pair(R.drawable.spotify, "Computer • Spotify")
         device.type.equals("Smartphone", ignoreCase = true) -> Pair(R.drawable.music_note, "Phone • Spotify")
-        device.type.equals("TV", ignoreCase = true) -> Pair(R.drawable.cast, "Smart TV")
+        device.type.equals("TV", ignoreCase = true) -> Pair(R.drawable.ic_tv, "Smart TV")
         else -> Pair(R.drawable.volume_up, "Smart Speaker • Spotify Connect")
     }
 }
