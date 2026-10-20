@@ -40,8 +40,8 @@ android {
         applicationId = applicationIdOverride ?: "com.frmusic4all.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 29
-        versionName = "1.2.4"
+        versionCode = 30
+        versionName = "1.2.5"
         val baseVersionName = requireNotNull(versionName)
         buildConfigField("String", "BASE_VERSION_NAME", "\"$baseVersionName\"")
         buildCommit?.let { versionName = "$baseVersionName+$it" }

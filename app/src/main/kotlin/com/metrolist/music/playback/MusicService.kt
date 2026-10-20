@@ -2248,6 +2248,7 @@ class MusicService :
     fun playNext(items: List<MediaItem>) {
         // If queue is empty or player is idle, play immediately instead
         if (player.mediaItemCount == 0 || player.playbackState == STATE_IDLE) {
+            currentPlayingMediaId = items.firstOrNull()?.mediaId
             player.setMediaItems(items)
             player.prepare()
             if (castConnectionHandler?.isCasting?.value != true && dlnaCastHandler?.isCasting?.value != true) {
@@ -4568,16 +4569,19 @@ class MusicService :
 
         override fun open(dataSpec: DataSpec): Long {
             val uriStr = dataSpec.uri.toString()
-            val isLiveOrRadio = isCurrentRadioProvider() ||
+            val isDirect = isCurrentRadioProvider() ||
                 dataSpec.key?.startsWith("radio:") == true ||
+                dataSpec.key?.startsWith("local:") == true ||
                 uriStr.startsWith("radio:") ||
+                uriStr.startsWith("content:") ||
+                uriStr.startsWith("file:") ||
                 uriStr.contains(".m3u8", ignoreCase = true) ||
                 uriStr.contains("/hls/", ignoreCase = true) ||
                 uriStr.contains("hls", ignoreCase = true) ||
                 uriStr.contains(".ts", ignoreCase = true) ||
                 dataSpec.isFlagSet(DataSpec.FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN)
 
-            activeDataSource = if (isLiveOrRadio) directDataSource else cacheDataSource
+            activeDataSource = if (isDirect) directDataSource else cacheDataSource
             return activeDataSource.open(dataSpec)
         }
 
@@ -4643,11 +4647,22 @@ class MusicService :
                 val localPath = runBlocking(Dispatchers.IO) {
                     database.getSongById(mediaId)?.song?.localPath
                 }
-                if (localPath != null) {
-                    return@Factory dataSpec.withUri(localPath.toUri())
+                val finalUri = when {
+                    localPath != null -> localPath.toUri()
+                    dataSpec.uri.scheme == "local" || dataSpec.uri.toString().startsWith("local:") -> {
+                        val rawId = mediaId.removePrefix("local:")
+                        android.net.Uri.withAppendedPath(
+                            android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                            rawId,
+                        )
+                    }
+                    else -> dataSpec.uri
                 }
-                // fallback: URI already set to localPath in MediaItem
-                return@Factory dataSpec
+                return@Factory dataSpec.buildUpon()
+                    .setUri(finalUri)
+                    .setKey(null)
+                    .setFlags(dataSpec.flags or DataSpec.FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN)
+                    .build()
             }
 
             val storedFormat = runBlocking(Dispatchers.IO) { database.format(mediaId).first() }
