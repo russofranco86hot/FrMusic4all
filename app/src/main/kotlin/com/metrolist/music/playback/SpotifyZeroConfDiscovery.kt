@@ -219,10 +219,11 @@ object SpotifyZeroConfDiscovery {
                     model.contains("Echo", ignoreCase = true) ||
                     remoteName.contains("Echo", ignoreCase = true) ||
                     remoteName.contains("Alexa", ignoreCase = true) ||
-                    remoteName.contains("Dot", ignoreCase = true)
+                    remoteName.contains("Dot", ignoreCase = true) ||
+                    remoteName.startsWith("eco_", ignoreCase = true)
 
-            if (isEchoOrAlexa && !remoteName.contains("Echo", ignoreCase = true) && model.isNotBlank()) {
-                remoteName = "$remoteName ($model)"
+            if (isEchoOrAlexa) {
+                remoteName = formatEchoName(remoteName, model, brand)
             }
 
             val spotifyDevice = SpotifyDevice(
@@ -252,8 +253,59 @@ object SpotifyZeroConfDiscovery {
         }
     }
 
-    suspend fun wakeUpDevice(deviceId: String) = withContext(Dispatchers.IO) {
-        val item = _discoveredDevices.value[deviceId] ?: return@withContext
+    fun formatEchoName(rawName: String, model: String?, brand: String?): String {
+        if (!model.isNullOrBlank() && model.contains("Echo", ignoreCase = true)) {
+            val isGeneric = rawName.isBlank() ||
+                    rawName.startsWith("echo_", ignoreCase = true) ||
+                    rawName.startsWith("eco_", ignoreCase = true) ||
+                    rawName.equals("echo", ignoreCase = true) ||
+                    rawName.equals(model, ignoreCase = true)
+            if (isGeneric) {
+                return model.trim()
+            }
+        }
+
+        var clean = rawName.trim()
+        if (clean.startsWith("eco_", ignoreCase = true)) {
+            clean = "echo_" + clean.substring(4)
+        }
+
+        if (clean.contains("_")) {
+            val words = clean.split("_").filter { it.isNotBlank() }
+            clean = words.joinToString(" ") { word ->
+                when (word.lowercase()) {
+                    "gen4" -> "Gen 4"
+                    "gen3" -> "Gen 3"
+                    "gen2" -> "Gen 2"
+                    "gen1" -> "Gen 1"
+                    "pop" -> "Pop"
+                    "show" -> "Show"
+                    "dot" -> "Dot"
+                    "plus" -> "Plus"
+                    "studio" -> "Studio"
+                    "echo" -> "Echo"
+                    else -> word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                }
+            }
+        }
+
+        if (!clean.contains("Echo", ignoreCase = true) && brand?.contains("Amazon", ignoreCase = true) == true) {
+            clean = "Echo $clean"
+        }
+
+        return clean
+    }
+
+    suspend fun wakeUpDevice(deviceId: String, deviceName: String? = null) = withContext(Dispatchers.IO) {
+        val item = _discoveredDevices.value[deviceId]
+            ?: _discoveredDevices.value.values.firstOrNull { entry ->
+                deviceName != null && (
+                    entry.device.name.equals(deviceName, ignoreCase = true) ||
+                    entry.device.name.contains(deviceName, ignoreCase = true) ||
+                    deviceName.contains(entry.device.name, ignoreCase = true)
+                )
+            }
+            ?: return@withContext
         val urlStr = "http://${item.ip}:${item.port}${item.cpath}?action=getInfo"
         Timber.d("SpotifyZeroConf: waking up device via $urlStr")
         httpGet(urlStr, timeoutMs = 1500)
@@ -268,7 +320,7 @@ object SpotifyZeroConfDiscovery {
                 readTimeout = timeoutMs
                 requestMethod = "GET"
                 useCaches = false
-                setRequestProperty("User-Agent", "FrMusic4all/1.1.0")
+                setRequestProperty("User-Agent", "FrMusic4all/1.2.4")
             }
             if (conn.responseCode in 200..299) {
                 BufferedReader(InputStreamReader(conn.inputStream, Charsets.UTF_8)).use {

@@ -58,26 +58,41 @@ object SpotifyConnectManager {
         }
     }
 
+    private fun normalizeName(name: String): String {
+        return name.lowercase()
+            .replace("_", " ")
+            .replace("-", " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
     private fun mergeAndPublishDevices(cloud: List<SpotifyDevice>, local: List<SpotifyDevice>) {
         val mergedMap = LinkedHashMap<String, SpotifyDevice>()
 
-        // Add cloud devices first
+        // 1. Add cloud devices first (these have official Spotify cloud IDs, required for playback)
         for (device in cloud) {
             val key = device.id ?: device.name
             mergedMap[key] = device
         }
 
-        // Add or enrich with locally discovered devices (Echoes in standby, etc.)
+        // 2. Add or enrich with locally discovered devices (Echoes in standby, etc.)
         for (localDevice in local) {
-            val key = localDevice.id ?: localDevice.name
-            val existing = mergedMap[key]
-            if (existing != null) {
-                // If it already exists in cloud list, prefer existing or keep active state
-                mergedMap[key] = existing.copy(
-                    name = if (localDevice.name.contains("Echo", ignoreCase = true)) localDevice.name else existing.name,
-                    type = localDevice.type,
+            val matchingCloudKey = mergedMap.entries.firstOrNull { (_, cloudDev) ->
+                (localDevice.id != null && cloudDev.id == localDevice.id) ||
+                (normalizeName(cloudDev.name) == normalizeName(localDevice.name)) ||
+                (cloudDev.name.isNotBlank() && normalizeName(cloudDev.name).contains(normalizeName(localDevice.name))) ||
+                (localDevice.name.isNotBlank() && normalizeName(localDevice.name).contains(normalizeName(cloudDev.name)))
+            }?.key
+
+            if (matchingCloudKey != null) {
+                // If matched to cloud device, preserve cloud ID and friendly cloud name
+                val existing = mergedMap[matchingCloudKey]!!
+                mergedMap[matchingCloudKey] = existing.copy(
+                    type = if (existing.type.isBlank()) localDevice.type else existing.type
                 )
             } else {
+                // Not in cloud list yet (e.g. Echo in standby)
+                val key = localDevice.id ?: localDevice.name
                 mergedMap[key] = localDevice
             }
         }
@@ -154,20 +169,20 @@ object SpotifyConnectManager {
                 }
 
                 // 1. Wake up the Echo via local ZeroConf probe
-                SpotifyZeroConfDiscovery.wakeUpDevice(initialDeviceId)
+                SpotifyZeroConfDiscovery.wakeUpDevice(initialDeviceId, device.name)
 
                 // 2. Poll Spotify cloud devices to resolve the canonical cloud device ID
                 var targetDeviceId = initialDeviceId
                 var resolvedDevice = device
 
-                for (attempt in 1..4) {
+                for (attempt in 1..5) {
                     delay(500)
                     val cloudDevices = Spotify.getAvailableDevices().getOrDefault(emptyList())
                     val matched = cloudDevices.firstOrNull { cloud ->
                         cloud.id == initialDeviceId ||
-                        cloud.name.equals(device.name, ignoreCase = true) ||
-                        (device.name.isNotBlank() && cloud.name.contains(device.name, ignoreCase = true)) ||
-                        (cloud.name.isNotBlank() && device.name.contains(cloud.name, ignoreCase = true))
+                        normalizeName(cloud.name) == normalizeName(device.name) ||
+                        (device.name.isNotBlank() && normalizeName(cloud.name).contains(normalizeName(device.name))) ||
+                        (cloud.name.isNotBlank() && normalizeName(device.name).contains(normalizeName(cloud.name)))
                     }
                     if (matched != null && !matched.id.isNullOrBlank()) {
                         targetDeviceId = matched.id

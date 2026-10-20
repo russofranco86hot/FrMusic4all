@@ -34,6 +34,7 @@ jobs:
         run: |
           mkdir -p output
           cp app/build/outputs/apk/gms/debug/app-gms-debug.apk output/FrMusic4all.apk
+          cp app/build/outputs/apk/gms/debug/app-gms-debug.apk output/FrMusic4all-WearOS.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -47,14 +48,15 @@ jobs:
             
             #### 🌟 Novedades:
             - 🖤 **Modo AMOLED Puro:** Fondo negro absoluto (#000000) en todos los componentes para ahorro de batería.
-            - 📡 **Soporte de Cast Ampliado:** Compatibilidad tanto con Google Cast (Chromecast) como con dispositivos **Amazon Echo / Alexa** y parlantes inteligentes vía DLNA/UPnP.
-            - 🎤 **Letras Sincronizadas en Tiempo Real:** Botón dedicado en el reproductor para visualizar y seguir la letra sincronizada línea a línea estilo karaoke.
-            - ⚙️ **Acerca de... Simplificado:** Pantalla "Acerca de..." renovada con versión dinámica y autoría de RUSSOFRANCO86.
-            - 🎨 **Nuevo Ícono:** Identidad visual renovada con Spotify, YouTube Music y notas musicales.
-            - 🎧 Fusión total entre Spotify (recomendaciones/listas) y YouTube Music (streaming sin anuncios).
+            - ⌚ **APK para Wear OS Standalone:** Incluye APK específico para relojes inteligentes Wear OS para funcionar de forma autónoma.
+            - 📻 **Radio Mundial en Vivo Continua:** Soporte completo de transmisiones HLS (`.m3u8`), favoritos e importación/exportación M3U.
+            - 📡 **Soporte de Cast & Echo:** Compatibilidad con Google Cast, dispositivos Amazon Echo y salida Bluetooth para relojes y altavoces.
+            - 🎤 **Letras Sincronizadas en Tiempo Real:** Botón dedicado para seguir la letra sincronizada estilo karaoke.
+            - ⚙️ **Acerca de... Simplificado:** Pantalla renovada con versión dinámica (${{ github.ref_name }}) y autoría de RUSSOFRANCO86.
             
             #### 📲 Instalación:
-            1. Descarga el archivo `FrMusic4all.apk` adjunto abajo.
-            2. Ábrelo en tu dispositivo Android.
-            3. Habilita "Permitir desde esta fuente" si el sistema lo solicita y ¡a disfrutar!
-          files: output/FrMusic4all.apk
+            - **Celulares y Tablets Android:** Descarga `FrMusic4all.apk`.
+            - **Relojes Wear OS (Galaxy Watch, Pixel Watch):** Descarga `FrMusic4all-WearOS.apk` e instálalo vía ADB o Wear Installer.
+          files: |
+            output/FrMusic4all.apk
+            output/FrMusic4all-WearOS.apk
