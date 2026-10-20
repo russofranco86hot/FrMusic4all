@@ -754,7 +754,9 @@ class MainActivity : FragmentActivity() {
                 val routeIndexMap = remember(navigationItems) {
                     navigationItems.mapIndexed { i, s -> s.route to i }.toMap()
                 }
-                val (slimNav) = rememberPreference(SlimNavBarKey, defaultValue = false)
+                val (userSlimNav) = rememberPreference(SlimNavBarKey, defaultValue = false)
+                val isWatch = remember { packageManager.hasSystemFeature(PackageManager.FEATURE_WATCH) }
+                val slimNav = userSlimNav || isWatch
                 val (useNewMiniPlayerDesign) = rememberPreference(UseNewMiniPlayerDesignKey, defaultValue = true)
                 val (defaultOpenTabInt) = rememberPreference(DefaultOpenTabKey, defaultValue = NavigationTab.HOME.name)
                 val defaultOpenTab = remember(defaultOpenTabInt) {

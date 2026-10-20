@@ -4505,8 +4505,19 @@ class MusicService :
         playerProvider: () -> ExoPlayer?,
     ): DataSource.Factory {
         return ResolvingDataSource.Factory(createCacheDataSource()) { dataSpec ->
-            val mediaId = stripQobuzCacheKeyPrefix(dataSpec.key ?: error("No media id"))
-            val storedFormat = runBlocking(Dispatchers.IO) { database.format(mediaId).first() }
+            val rawKey = dataSpec.key ?: dataSpec.uri.toString()
+            val mediaId = stripQobuzCacheKeyPrefix(rawKey)
+
+            // Direct HTTP/HTTPS audio or HLS segment
+            if (mediaId.startsWith("http://") || mediaId.startsWith("https://")) {
+                return@Factory dataSpec.withUri(mediaId.toUri())
+            }
+
+            // Radio stream URI
+            if (mediaId.startsWith("radio:")) {
+                val radioUrl = mediaId.removePrefix("radio:")
+                return@Factory dataSpec.withUri(radioUrl.toUri())
+            }
 
             // Handle local audio files — resolve to content URI and bypass YouTube fetch
             if (mediaId.startsWith("local:")) {
@@ -4520,14 +4531,7 @@ class MusicService :
                 return@Factory dataSpec
             }
 
-            // Handle radio streams and direct audio streams
-            if (mediaId.startsWith("radio:")) {
-                val radioUrl = mediaId.removePrefix("radio:")
-                return@Factory dataSpec.withUri(radioUrl.toUri())
-            }
-            if (mediaId.startsWith("http://") || mediaId.startsWith("https://")) {
-                return@Factory dataSpec.withUri(mediaId.toUri())
-            }
+            val storedFormat = runBlocking(Dispatchers.IO) { database.format(mediaId).first() }
 
 
             val shouldBypassCache = bypassCacheForQualityChange.contains(mediaId)

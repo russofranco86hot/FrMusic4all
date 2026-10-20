@@ -1247,4 +1247,10 @@
     <string name="radio_loading">Loading stations…</string>
     <string name="radio_all_countries">All Countries</string>
     <string name="radio_all_genres">All Genres</string>
+
+    <!-- Bluetooth & Watch audio routing -->
+    <string name="bluetooth_and_watch_title">Smartwatch &amp; Bluetooth Devices</string>
+    <string name="bluetooth_and_watch_desc">Galaxy Watch, Wear OS, Amazon Echo BT &amp; speakers</string>
+    <string name="open_system_output_switcher">Switch audio output (Watch / Bluetooth)</string>
+    <string name="echo_bluetooth_hint">To stream Radio and all audio to Amazon Echo or your Watch, connect via Bluetooth by saying “Alexa, connect my phone”.</string>
 </resources>

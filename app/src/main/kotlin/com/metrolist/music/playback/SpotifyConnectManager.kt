@@ -178,6 +178,13 @@ object SpotifyConnectManager {
                 }
 
                 // 3. Resolve track URI if music is currently playing
+                if (currentMedia?.id?.startsWith("radio:") == true) {
+                    withContext(Dispatchers.Main) {
+                        onError?.invoke("Las radios en vivo se transmiten a tu Echo o Reloj por Bluetooth. Di «Alexa, conecta mi teléfono».")
+                    }
+                    return@launch
+                }
+
                 var trackUri: String? = null
                 if (currentMedia != null) {
                     val registered = SpotifyMetadataRegistry.get(currentMedia.id)
@@ -206,12 +213,10 @@ object SpotifyConnectManager {
                     delay(300)
                     Timber.d("SpotifyConnect: playing $finalTrackUri on device ${resolvedDevice.name}")
                     val playRes = Spotify.playTrackOnDevice(targetDeviceId, finalTrackUri)
-                    if (playRes.isFailure && transferResult.isSuccess) {
-                        // Transfer worked, even if playTrackOnDevice failed
-                        transferResult
-                    } else {
-                        playRes
+                    if (playRes.isFailure) {
+                        Timber.w("SpotifyConnect: playTrackOnDevice failed, checking transfer result: ${playRes.exceptionOrNull()?.message}")
                     }
+                    playRes
                 } else {
                     transferResult
                 }

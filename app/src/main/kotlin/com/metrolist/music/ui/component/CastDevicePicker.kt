@@ -48,6 +48,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.metrolist.music.LocalPlayerConnection
 import com.metrolist.music.R
+import com.metrolist.music.playback.BluetoothDeviceManager
 import com.metrolist.music.playback.SpotifyConnectManager
 import com.metrolist.spotify.models.SpotifyDevice
 
@@ -58,6 +59,9 @@ fun CastDevicePicker(
     val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
+
+    // Bluetooth & Watch state
+    val bluetoothDevices by BluetoothDeviceManager.connectedDevices.collectAsStateWithLifecycle()
 
     // Google Cast state
     val castHandler = playerConnection.service.castConnectionHandler
@@ -80,6 +84,8 @@ fun CastDevicePicker(
     LaunchedEffect(Unit) {
         SpotifyConnectManager.scanDevices(context)
         dlnaHandler?.startDiscovery()
+        BluetoothDeviceManager.init(context)
+        BluetoothDeviceManager.refreshDevices()
     }
 
     AlertDialog(
@@ -122,6 +128,7 @@ fun CastDevicePicker(
                         onClick = {
                             SpotifyConnectManager.scanDevices(context)
                             dlnaHandler?.startDiscovery()
+                            BluetoothDeviceManager.refreshDevices()
                         },
                         modifier = Modifier.size(32.dp),
                     ) {
@@ -367,6 +374,80 @@ fun CastDevicePicker(
                             },
                         )
                     }
+                }
+
+                // Smartwatch (Reloj) & Bluetooth Devices section
+                item {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    Text(
+                        text = stringResource(R.string.bluetooth_and_watch_title),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                    )
+                }
+
+                if (bluetoothDevices.isNotEmpty()) {
+                    items(bluetoothDevices) { btDevice ->
+                        DeviceItemRow(
+                            iconRes = if (btDevice.isWatch) R.drawable.ic_watch else R.drawable.volume_up,
+                            title = btDevice.name,
+                            subtitle = btDevice.typeDescription,
+                            isActive = btDevice.isCurrentOutput,
+                            onClick = {
+                                BluetoothDeviceManager.openMediaOutputPanel(context)
+                                onDismissRequest()
+                            },
+                        )
+                    }
+                }
+
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                BluetoothDeviceManager.openMediaOutputPanel(context)
+                                onDismissRequest()
+                            }
+                            .padding(vertical = 4.dp),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(12.dp),
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.volume_up),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.open_system_output_switcher),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = stringResource(R.string.bluetooth_and_watch_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = stringResource(R.string.echo_bluetooth_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                    )
                 }
             }
         },

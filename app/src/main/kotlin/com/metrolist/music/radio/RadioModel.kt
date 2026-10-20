@@ -54,7 +54,19 @@ data class RadioStation(
         )
     }
 
-    fun toMediaItem(): MediaItem = toMediaMetadata().toMediaItem()
+    fun toMediaItem(): MediaItem {
+        val stream = streamUrl
+        val isHls = stream.contains(".m3u8", ignoreCase = true) || stream.contains("hls", ignoreCase = true)
+        val baseItem = toMediaMetadata().toMediaItem()
+        return baseItem.buildUpon()
+            .setUri(stream)
+            .apply {
+                if (isHls) {
+                    setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
+                }
+            }
+            .build()
+    }
 }
 
 @Serializable
