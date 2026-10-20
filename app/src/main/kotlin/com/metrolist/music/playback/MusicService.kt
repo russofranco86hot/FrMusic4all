@@ -544,6 +544,8 @@ class MusicService :
     private var cachedShufflePlaylistFirst = false
     @Volatile
     private var cachedAutoLoadMore = true
+    @Volatile
+    private var currentPlayingMediaId: String? = null
 
     // URL cache for stream URLs - class-level so it can be invalidated on errors
     private val songUrlCache = StreamUrlCache()
@@ -2003,7 +2005,9 @@ class MusicService :
                     ),
                 )
             } else {
-                val isRadio = initialStatus.items.getOrNull(initialStatus.mediaItemIndex)?.mediaId?.startsWith("radio:") == true
+                val currentItem = initialStatus.items.getOrNull(initialStatus.mediaItemIndex)
+                val isRadio = currentItem?.mediaId?.startsWith("radio:") == true
+                currentPlayingMediaId = currentItem?.mediaId
                 val startPosition = if (isRadio) {
                     androidx.media3.common.C.TIME_UNSET
                 } else {
@@ -2801,6 +2805,7 @@ class MusicService :
             }
         }
         lastTransitionedMediaId = mediaItem?.mediaId
+        currentPlayingMediaId = mediaItem?.mediaId
         initialBufferRecoveryJob?.cancel()
         initialBufferRecoveryJob = null
         initialBufferRecoveryAttemptedMediaId = null
@@ -4552,7 +4557,7 @@ class MusicService :
     private class SelectiveDataSource(
         private val cacheDataSource: DataSource,
         private val directDataSource: DataSource,
-        private val playerProvider: () -> ExoPlayer?,
+        private val isCurrentRadioProvider: () -> Boolean,
     ) : DataSource {
         private var activeDataSource: DataSource = cacheDataSource
 
@@ -4563,8 +4568,7 @@ class MusicService :
 
         override fun open(dataSpec: DataSpec): Long {
             val uriStr = dataSpec.uri.toString()
-            val currentMediaId = playerProvider()?.currentMediaItem?.mediaId
-            val isLiveOrRadio = currentMediaId?.startsWith("radio:") == true ||
+            val isLiveOrRadio = isCurrentRadioProvider() ||
                 dataSpec.key?.startsWith("radio:") == true ||
                 uriStr.startsWith("radio:") ||
                 uriStr.contains(".m3u8", ignoreCase = true) ||
@@ -4600,7 +4604,7 @@ class MusicService :
             SelectiveDataSource(
                 cacheDataSource = cacheFactory.createDataSource(),
                 directDataSource = directFactory.createDataSource(),
-                playerProvider = playerProvider,
+                isCurrentRadioProvider = { currentPlayingMediaId?.startsWith("radio:") == true },
             )
         }
 

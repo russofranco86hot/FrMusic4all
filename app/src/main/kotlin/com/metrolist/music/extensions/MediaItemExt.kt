@@ -34,10 +34,27 @@ fun SongItem.toMediaItem() = toMediaMetadata().toMediaItem()
 fun MediaMetadata.toMediaItem(): MediaItem {
     val resolvedMetadata = withResolvedArtistNameAliases()
     val artistNames = resolvedMetadata.artists.joinToString { it.name }
+    val isRadio = resolvedMetadata.id.startsWith("radio:")
+    val streamUri = if (isRadio) resolvedMetadata.id.removePrefix("radio:") else resolvedMetadata.id
+    val isHls = isRadio && (streamUri.contains(".m3u8", ignoreCase = true) || streamUri.contains("hls", ignoreCase = true))
+
     return MediaItem.Builder()
         .setMediaId(resolvedMetadata.id)
-        .setUri(resolvedMetadata.id)
-        .setCustomCacheKey(resolvedMetadata.id)
+        .setUri(streamUri)
+        .setCustomCacheKey(if (isRadio) null else resolvedMetadata.id)
+        .apply {
+            if (isRadio) {
+                setLiveConfiguration(
+                    MediaItem.LiveConfiguration.Builder()
+                        .setMaxPlaybackSpeed(1.02f)
+                        .setMinPlaybackSpeed(0.98f)
+                        .build()
+                )
+            }
+            if (isHls) {
+                setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
+            }
+        }
         .setTag(resolvedMetadata)
         .setMediaMetadata(
             androidx.media3.common.MediaMetadata.Builder()
@@ -48,7 +65,7 @@ fun MediaMetadata.toMediaItem(): MediaItem {
                 .setAlbumTitle(resolvedMetadata.album?.title)
                 .setAlbumArtist(resolvedMetadata.artists.firstOrNull()?.name)
                 .setDisplayTitle(resolvedMetadata.title)
-                .setMediaType(MEDIA_TYPE_MUSIC)
+                .setMediaType(if (isRadio) androidx.media3.common.MediaMetadata.MEDIA_TYPE_RADIO_STATION else MEDIA_TYPE_MUSIC)
                 .setIsBrowsable(false)
                 .setIsPlayable(true)
                 .setExtras(Bundle().apply {
