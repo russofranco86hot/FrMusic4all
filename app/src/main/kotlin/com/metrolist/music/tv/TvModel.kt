@@ -11,6 +11,7 @@ data class TvChannel(
     val category: TvCategory,
     val description: String,
     val youtubeHandle: String? = null,
+    val channelId: String? = null,
     val directStreamUrl: String? = null,
     val logoUrl: String,
     val isFavorite: Boolean = false,

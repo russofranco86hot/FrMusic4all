@@ -5,6 +5,12 @@
 
 package com.metrolist.music.ui.player
 
+import android.view.ViewGroup
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.compose.runtime.key
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -600,21 +606,101 @@ private fun ThumbnailItem(
             if (hidePlayerThumbnail) {
                 HiddenThumbnailPlaceholder(textBackgroundColor = textBackgroundColor)
             } else if (isVideoMode && item.mediaId == currentMediaId) {
-                AndroidView(
-                    factory = { ctx ->
-                        PlayerView(ctx).apply {
-                            player = playerConnection.player
-                            useController = false
-                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                val isHls = item.mediaId.startsWith("tv:http") || item.mediaId.contains(".m3u8", ignoreCase = true)
+                if (isHls || playerConnection.player.videoFormat != null) {
+                    AndroidView(
+                        factory = { ctx ->
+                            PlayerView(ctx).apply {
+                                player = playerConnection.player
+                                useController = false
+                                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                            }
+                        },
+                        update = { view ->
+                            if (view.player !== playerConnection.player) {
+                                view.player = playerConnection.player
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    val rawVideoId = item.mediaId.removePrefix("tv:")
+                    val videoId = if (rawVideoId.length == 11 && !rawVideoId.startsWith("radio:") && !rawVideoId.startsWith("local:")) rawVideoId else null
+                    if (videoId != null) {
+                        key(videoId) {
+                            AndroidView(
+                                factory = { ctx ->
+                                    WebView(ctx).apply {
+                                        layoutParams = ViewGroup.LayoutParams(
+                                            ViewGroup.LayoutParams.MATCH_PARENT,
+                                            ViewGroup.LayoutParams.MATCH_PARENT,
+                                        )
+                                        settings.apply {
+                                            javaScriptEnabled = true
+                                            domStorageEnabled = true
+                                            mediaPlaybackRequiresUserGesture = false
+                                            loadWithOverviewMode = true
+                                            useWideViewPort = true
+                                        }
+                                        setBackgroundColor(android.graphics.Color.BLACK)
+                                        webViewClient = WebViewClient()
+                                        webChromeClient = WebChromeClient()
+                                        val html = """
+                                            <!DOCTYPE html>
+                                            <html>
+                                            <head>
+                                            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                                            <style>
+                                                * { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background-color:#000; }
+                                                iframe { position:absolute; top:0; left:0; width:100%; height:100%; border:0; }
+                                            </style>
+                                            </head>
+                                            <body>
+                                            <iframe 
+                                                id="ytplayer"
+                                                src="https://www.youtube-nocookie.com/embed/$videoId?autoplay=1&playsinline=1&controls=0&mute=1&rel=0&modestbranding=1&enablejsapi=1" 
+                                                allow="autoplay; encrypted-media; picture-in-picture" 
+                                                allowfullscreen>
+                                            </iframe>
+                                            </body>
+                                            </html>
+                                        """.trimIndent()
+                                        loadDataWithBaseURL("https://www.youtube.com", html, "text/html", "UTF-8", null)
+                                    }
+                                },
+                                update = { webView ->
+                                    val isPlaying = playerConnection.player.isPlaying
+                                    val jsCommand = if (isPlaying) {
+                                        "var p = document.getElementById('ytplayer'); if (p && p.contentWindow) { p.contentWindow.postMessage('{\"event\":\"command\",\"func\":\"playVideo\",\"args\":\"\"}', '*'); }"
+                                    } else {
+                                        "var p = document.getElementById('ytplayer'); if (p && p.contentWindow) { p.contentWindow.postMessage('{\"event\":\"command\",\"func\":\"pauseVideo\",\"args\":\"\"}', '*'); }"
+                                    }
+                                    webView.evaluateJavascript(jsCommand, null)
+                                },
+                                onRelease = { webView ->
+                                    webView.destroy()
+                                },
+                                modifier = Modifier.fillMaxSize(),
+                            )
                         }
-                    },
-                    update = { view ->
-                        if (view.player !== playerConnection.player) {
-                            view.player = playerConnection.player
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                )
+                    } else {
+                        AndroidView(
+                            factory = { ctx ->
+                                PlayerView(ctx).apply {
+                                    player = playerConnection.player
+                                    useController = false
+                                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                }
+                            },
+                            update = { view ->
+                                if (view.player !== playerConnection.player) {
+                                    view.player = playerConnection.player
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
             } else {
                 val artworkUriToUse = if (item.mediaId == currentMediaId && !currentMediaThumbnail.isNullOrBlank()) {
                     currentMediaThumbnail

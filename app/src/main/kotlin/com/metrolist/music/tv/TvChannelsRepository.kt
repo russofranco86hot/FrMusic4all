@@ -8,6 +8,7 @@ package com.metrolist.music.tv
 import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import com.metrolist.innertube.YouTube
 import com.metrolist.music.utils.dataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -46,6 +47,7 @@ class TvChannelsRepository(private val context: Context) {
             category = TvCategory.STREAMING,
             description = "Nadie Dice Nada, Antes Que Nadie, Patria y Familia, Tarde Para Nada",
             youtubeHandle = "@luzutv",
+            channelId = "UCTHaNTsP7hsVgBxARZTuajw",
             logoUrl = "https://yt3.googleusercontent.com/4qKjBqFw_iYkC4q1YjKq3kG9qN9n5vE=s900-c-k-c0x00ffffff-no-rj",
         ),
         TvChannel(
@@ -54,6 +56,7 @@ class TvChannelsRepository(private val context: Context) {
             category = TvCategory.STREAMING,
             description = "Migue Granados, Soñé Que Volaba, Sería Increíble, Tapados de Laburo",
             youtubeHandle = "@olgaenvivo_",
+            channelId = "UC7mJ2EDXFomeDIRFu5FtEbA",
             logoUrl = "https://yt3.googleusercontent.com/9nF_z5lX4Bq1v2q7b=s900-c-k-c0x00ffffff-no-rj",
         ),
         TvChannel(
@@ -86,7 +89,7 @@ class TvChannelsRepository(private val context: Context) {
             category = TvCategory.STREAMING,
             description = "Andy Kusnetzoff, Matías Martin, Sebastián Wainraich, María O'Donnell",
             youtubeHandle = "@UrbanaPlay1043",
-            directStreamUrl = "https://live-01-02-urbanaplay.solumedia.com.ar/urbanaplay/hls/urbanatv/main.m3u8",
+            directStreamUrl = "https://live-ar1.cdnrad.com/hls/radio-285/live.m3u8",
             logoUrl = "https://yt3.googleusercontent.com/urbanaplay=s900-c-k-c0x00ffffff-no-rj",
         ),
         TvChannel(
@@ -121,6 +124,7 @@ class TvChannelsRepository(private val context: Context) {
             category = TvCategory.NEWS,
             description = "Noticias en vivo las 24 horas del día",
             youtubeHandle = "@todonoticias",
+            directStreamUrl = "https://live-01-01-tn.vodgc.net/TN_DAI_Beta/index.m3u8",
             logoUrl = "https://yt3.googleusercontent.com/tn=s900-c-k-c0x00ffffff-no-rj",
         ),
         TvChannel(
@@ -192,23 +196,42 @@ class TvChannelsRepository(private val context: Context) {
     private val resolvedCache = mutableMapOf<String, Pair<String, Long>>()
 
     suspend fun resolveStreamUri(channel: TvChannel): String? = withContext(Dispatchers.IO) {
-        // Direct HLS stream if available
+        // 1. Direct HLS stream if available
         if (!channel.directStreamUrl.isNullOrBlank()) {
             return@withContext channel.directStreamUrl
         }
 
-        val handle = channel.youtubeHandle ?: return@withContext null
+        val cacheKey = channel.youtubeHandle ?: channel.channelId ?: channel.id
 
         // Check 10-minute in-memory cache
-        val cached = resolvedCache[handle]
+        val cached = resolvedCache[cacheKey]
         val now = System.currentTimeMillis()
         if (cached != null && (now - cached.second) < 10 * 60 * 1000L) {
             return@withContext cached.first
         }
 
-        val videoId = resolveLiveVideoId(handle)
+        val handle = channel.youtubeHandle
+        var videoId: String? = null
+
+        // 2. Try live stream resolution
+        if (!handle.isNullOrBlank()) {
+            videoId = resolveLiveVideoId(handle)
+        }
+
+        // 3. Fallback: If off-air / not live right now, get latest full show from RSS feed
+        val effectiveChannelId = channel.channelId ?: (if (!handle.isNullOrBlank()) resolveChannelId(handle) else null)
+        if (videoId == null && !effectiveChannelId.isNullOrBlank()) {
+            videoId = resolveLatestVideoFromFeed(effectiveChannelId)
+        }
+
+        // 4. Final fallback: YouTube search for latest live or full program
+        if (videoId == null) {
+            videoId = resolveViaSearch("${channel.name} en vivo")
+                ?: resolveViaSearch("${channel.name} programa completo")
+        }
+
         if (videoId != null) {
-            resolvedCache[handle] = Pair(videoId, now)
+            resolvedCache[cacheKey] = Pair(videoId, now)
             return@withContext videoId
         }
 
@@ -262,5 +285,76 @@ class TvChannelsRepository(private val context: Context) {
             Timber.w(e, "TvChannelsRepository: error resolving live stream for $handle")
         }
         null
+    }
+
+    private fun resolveChannelId(handle: String): String? {
+        return try {
+            val cleanHandle = if (handle.startsWith("@")) handle else "@$handle"
+            val url = URL("https://www.youtube.com/$cleanHandle")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 4000
+                readTimeout = 4000
+                setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            }
+            if (conn.responseCode in 200..299) {
+                val html = conn.inputStream.bufferedReader().use { it.readText() }
+                conn.disconnect()
+                val match = Regex("\"browseId\":\"(UC[a-zA-Z0-9_-]{20,24})\"").find(html)
+                    ?: Regex("channel_id=(UC[a-zA-Z0-9_-]{20,24})").find(html)
+                    ?: Regex("\"channelId\":\"(UC[a-zA-Z0-9_-]{20,24})\"").find(html)
+                match?.groupValues?.get(1)
+            } else {
+                conn.disconnect()
+                null
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "TvChannelsRepository: error resolving channelId for $handle")
+            null
+        }
+    }
+
+    private fun resolveLatestVideoFromFeed(channelId: String): String? {
+        return try {
+            val feedUrl = URL("https://www.youtube.com/feeds/videos.xml?channel_id=$channelId")
+            val conn = (feedUrl.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 4000
+                readTimeout = 4000
+                setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            }
+            if (conn.responseCode in 200..299) {
+                val xml = conn.inputStream.bufferedReader().use { it.readText() }
+                conn.disconnect()
+                val entryRegex = Regex("<entry>([\\s\\S]*?)</entry>")
+                val entries = entryRegex.findAll(xml).toList()
+                for (entry in entries) {
+                    val content = entry.groupValues[1]
+                    val titleMatch = Regex("<title>([^<]+)</title>").find(content)
+                    val title = titleMatch?.groupValues?.get(1)?.lowercase() ?: ""
+                    if (title.contains("#shorts") || title.contains("#short")) continue
+                    val videoIdMatch = Regex("<yt:videoId>([a-zA-Z0-9_-]{11})</yt:videoId>").find(content)
+                    if (videoIdMatch != null) {
+                        return videoIdMatch.groupValues[1]
+                    }
+                }
+                val fallbackMatch = Regex("<yt:videoId>([a-zA-Z0-9_-]{11})</yt:videoId>").find(xml)
+                fallbackMatch?.groupValues?.get(1)
+            } else {
+                conn.disconnect()
+                null
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "TvChannelsRepository: error fetching RSS feed for $channelId")
+            null
+        }
+    }
+
+    private suspend fun resolveViaSearch(query: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val result = YouTube.search(query, YouTube.SearchFilter.FILTER_VIDEO).getOrNull()
+            result?.items?.firstOrNull()?.id
+        } catch (e: Exception) {
+            Timber.w(e, "TvChannelsRepository: search failed for $query")
+            null
+        }
     }
 }
