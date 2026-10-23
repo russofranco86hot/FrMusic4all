@@ -43,7 +43,7 @@ fun MediaMetadata.toMediaItem(): MediaItem {
         else -> resolvedMetadata.id
     }
     val isDirectUrl = streamUri.startsWith("http://") || streamUri.startsWith("https://")
-    val isHls = isLive && (streamUri.contains(".m3u8", ignoreCase = true) || streamUri.contains("hls", ignoreCase = true))
+    val isHls = isLive && (streamUri.contains(".m3u8", ignoreCase = true) || streamUri.contains("hls", ignoreCase = true) || streamUri.contains("manifest.googlevideo.com", ignoreCase = true))
 
     return MediaItem.Builder()
         .setMediaId(resolvedMetadata.id)

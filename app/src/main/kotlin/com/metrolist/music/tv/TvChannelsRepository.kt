@@ -545,15 +545,23 @@ class TvChannelsRepository(private val context: Context) {
         if (videoId == null && !channel.channelId.isNullOrBlank()) {
             videoId = resolveLiveVideoId(channel.channelId)
         }
+        if (videoId == null) {
+            val liveResults = searchLiveStreamsFromYouTube("${channel.name} en vivo")
+            val liveMatch = liveResults.firstOrNull { it.directStreamUrl != null }
+            if (liveMatch?.directStreamUrl != null) {
+                videoId = liveMatch.directStreamUrl.substringAfter("watch?v=").substringBefore("&").substringBefore("?")
+            }
+        }
         if (videoId == null && !channel.fallbackVideoId.isNullOrBlank()) {
             videoId = channel.fallbackVideoId
         }
 
         if (videoId != null && videoId.length == 11) {
             val hlsUrl = resolveHlsManifestUrl(videoId)
-            val streamUrlToUse = hlsUrl ?: "https://www.youtube.com/watch?v=$videoId"
-            resolvedCache[cacheKey] = Pair(streamUrlToUse, now)
-            return@withContext streamUrlToUse
+            if (hlsUrl != null) {
+                resolvedCache[cacheKey] = Pair(hlsUrl, now)
+                return@withContext hlsUrl
+            }
         }
 
         // 4. Fallback to direct stream URL if provided
@@ -566,10 +574,12 @@ class TvChannelsRepository(private val context: Context) {
 
     companion object {
         suspend fun resolveHlsManifestUrl(videoId: String): String? = withContext(Dispatchers.IO) {
-            // 1. Try InnerTube PlayerResponse
+            // 1. Try InnerTube PlayerResponse with ANDROID client (proven to return HLS manifest for live streams)
             try {
-                val response = YouTube.player(videoId, client = YouTubeClient.WEB).getOrNull()
-                    ?: YouTube.player(videoId, client = YouTubeClient.ANDROID_MUSIC).getOrNull()
+                val response = YouTube.player(videoId, client = YouTubeClient.ANDROID).getOrNull()
+                    ?: YouTube.player(videoId, client = YouTubeClient.IOS).getOrNull()
+                    ?: YouTube.player(videoId, client = YouTubeClient.TVHTML5).getOrNull()
+                    ?: YouTube.player(videoId, client = YouTubeClient.WEB).getOrNull()
                 val manifest = response?.streamingData?.hlsManifestUrl
                 if (!manifest.isNullOrBlank()) {
                     return@withContext manifest
@@ -637,6 +647,14 @@ class TvChannelsRepository(private val context: Context) {
                 if (videoId == null) {
                     val canonicalMatch = Regex("canonical\"\\s+href=\"https://www\\.youtube\\.com/watch\\?v=([a-zA-Z0-9_-]{11})\"").find(html)
                     videoId = canonicalMatch?.groupValues?.get(1)
+                }
+
+                if (videoId == null) {
+                    val idMatch = Regex("\"videoId\":\"([a-zA-Z0-9_-]{11})\"").find(html)
+                        ?: Regex("watchEndpoint\":\\s*\\{\\s*\"videoId\":\\s*\"([a-zA-Z0-9_-]{11})\"").find(html)
+                        ?: Regex("youtube\\.com/watch\\?v=([a-zA-Z0-9_-]{11})").find(html)
+                        ?: Regex("youtube\\.com/embed/([a-zA-Z0-9_-]{11})").find(html)
+                    videoId = idMatch?.groupValues?.get(1)
                 }
 
                 if (videoId != null && videoId.length == 11) {

@@ -429,6 +429,12 @@ fun RadioScreen(
                         },
                         onDeleteRecording = { rec ->
                             viewModel.recordingManager.deleteRecording(rec)
+                        },
+                        onExportRecording = { rec ->
+                            viewModel.recordingManager.exportRecordingToDownloads(rec, context)
+                        },
+                        onShareRecording = { rec ->
+                            viewModel.recordingManager.shareRecording(rec, context)
                         }
                     )
                 }
@@ -919,6 +925,8 @@ private fun RecordingsTabContent(
     recordings: List<com.metrolist.music.radio.RadioRecording>,
     onPlayRecording: (com.metrolist.music.radio.RadioRecording) -> Unit,
     onDeleteRecording: (com.metrolist.music.radio.RadioRecording) -> Unit,
+    onExportRecording: ((com.metrolist.music.radio.RadioRecording) -> Unit)? = null,
+    onShareRecording: ((com.metrolist.music.radio.RadioRecording) -> Unit)? = null,
 ) {
     val isWatch = LocalIsWatch.current
     val insets = LocalPlayerAwareWindowInsets.current.asPaddingValues()
@@ -1025,6 +1033,32 @@ private fun RecordingsTabContent(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                    if (onExportRecording != null) {
+                        IconButton(
+                            onClick = { onExportRecording(rec) },
+                            modifier = Modifier.size(if (isWatch) 28.dp else 36.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.download),
+                                contentDescription = "Descargar en Descargas",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(if (isWatch) 16.dp else 20.dp)
+                            )
+                        }
+                    }
+                    if (onShareRecording != null) {
+                        IconButton(
+                            onClick = { onShareRecording(rec) },
+                            modifier = Modifier.size(if (isWatch) 28.dp else 36.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.share),
+                                contentDescription = "Compartir",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.size(if (isWatch) 16.dp else 20.dp)
+                            )
+                        }
                     }
                     IconButton(
                         onClick = { showDeleteDialog = true },

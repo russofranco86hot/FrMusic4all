@@ -5,9 +5,15 @@
 
 package com.metrolist.music.radio
 
+import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
+import android.media.MediaScannerConnection
+import android.os.Build
 import android.os.Environment
+import android.provider.MediaStore
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
 import com.metrolist.music.extensions.toMediaItem
@@ -337,6 +343,87 @@ class RadioRecordingManager(private val context: Context) {
                 items = listOf(mediaItem),
             )
         )
+    }
+
+    fun exportRecordingToDownloads(recording: RadioRecording, ctx: Context = context): Boolean {
+        val sourceFile = File(recording.filePath)
+        if (!sourceFile.exists()) {
+            Toast.makeText(ctx, "Archivo de grabación no encontrado", Toast.LENGTH_SHORT).show()
+            return false
+        }
+
+        return try {
+            val fileName = sourceFile.name
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "audio/mpeg")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/FrMusic4all")
+                    put(MediaStore.MediaColumns.IS_PENDING, 1)
+                }
+                val resolver = ctx.contentResolver
+                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                    ?: resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
+                if (uri != null) {
+                    resolver.openOutputStream(uri)?.use { output ->
+                        sourceFile.inputStream().use { input ->
+                            input.copyTo(output)
+                        }
+                    }
+                    values.clear()
+                    values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                    resolver.update(uri, values, null, null)
+                    Toast.makeText(ctx, "Grabación guardada en Descargas/FrMusic4all", Toast.LENGTH_LONG).show()
+                    return true
+                }
+            }
+
+            // Fallback for Android 9 / API 28 and older
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val targetFolder = File(downloadsDir, "FrMusic4all")
+            if (!targetFolder.exists()) targetFolder.mkdirs()
+            val destFile = File(targetFolder, fileName)
+            sourceFile.copyTo(destFile, overwrite = true)
+
+            MediaScannerConnection.scanFile(
+                ctx,
+                arrayOf(destFile.absolutePath),
+                arrayOf("audio/mpeg"),
+                null
+            )
+            Toast.makeText(ctx, "Grabación guardada en Descargas/FrMusic4all: $fileName", Toast.LENGTH_LONG).show()
+            true
+        } catch (e: Exception) {
+            Timber.e(e, "RadioRecordingManager: error exporting recording")
+            Toast.makeText(ctx, "Error al guardar en Descargas: ${e.message}", Toast.LENGTH_LONG).show()
+            false
+        }
+    }
+
+    fun shareRecording(recording: RadioRecording, ctx: Context = context) {
+        val sourceFile = File(recording.filePath)
+        if (!sourceFile.exists()) {
+            Toast.makeText(ctx, "Archivo de grabación no encontrado", Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            val uri = FileProvider.getUriForFile(
+                ctx,
+                "${ctx.packageName}.FileProvider",
+                sourceFile
+            )
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "audio/*"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val chooser = Intent.createChooser(shareIntent, "Compartir grabación de radio")
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            ctx.startActivity(chooser)
+        } catch (e: Exception) {
+            Timber.e(e, "RadioRecordingManager: error sharing recording")
+            Toast.makeText(ctx, "Error al compartir: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun readPersistedRecordings(): List<RadioRecording> {

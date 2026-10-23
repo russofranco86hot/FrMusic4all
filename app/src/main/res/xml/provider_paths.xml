@@ -12,4 +12,10 @@
     <external-files-path
         name="external_files_documents"
         path="Documents/MetrolistExports/" />
+    <external-files-path
+        name="external_files_all"
+        path="." />
+    <files-path
+        name="internal_files_all"
+        path="." />
 </paths>

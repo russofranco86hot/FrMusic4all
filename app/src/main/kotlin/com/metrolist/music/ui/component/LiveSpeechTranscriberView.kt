@@ -18,9 +18,11 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,12 +32,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -61,6 +67,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.metrolist.music.R
 import com.metrolist.music.lyrics.LiveSpeechTranscriber
+import com.metrolist.music.lyrics.TranscriberLanguage
 
 @Composable
 fun LiveSpeechTranscriberView(
@@ -72,6 +79,8 @@ fun LiveSpeechTranscriberView(
     val isListening by LiveSpeechTranscriber.isListening.collectAsStateWithLifecycle()
     val lines by LiveSpeechTranscriber.transcribedLines.collectAsStateWithLifecycle()
     val partial by LiveSpeechTranscriber.currentPartialText.collectAsStateWithLifecycle()
+    val selectedLanguage by LiveSpeechTranscriber.selectedLanguage.collectAsStateWithLifecycle()
+    val soundLevel by LiveSpeechTranscriber.soundLevel.collectAsStateWithLifecycle()
 
     val listState = rememberLazyListState()
 
@@ -145,9 +154,45 @@ fun LiveSpeechTranscriberView(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .padding(horizontal = 20.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        // --- Language Selector Chips ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Idioma:",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TranscriberLanguage.entries.forEach { lang ->
+                val isSelected = lang == selectedLanguage
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { LiveSpeechTranscriber.setLanguage(lang) },
+                    label = {
+                        Text(
+                            text = "${lang.flag} ${lang.displayName}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                )
+            }
+        }
+
         if (!isListening && lines.isEmpty() && partial.isBlank()) {
             // Idle empty state
             Spacer(modifier = Modifier.weight(0.3f))
@@ -167,7 +212,7 @@ fun LiveSpeechTranscriberView(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Activa el reconocimiento de voz para escuchar la transmisión y escribir en tiempo real lo que están diciendo o cantando.",
+                text = "Reconoce la voz o canto en tiempo real en ${selectedLanguage.displayName} (${selectedLanguage.flag}). Puedes cambiar el idioma arriba.",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
@@ -214,7 +259,7 @@ fun LiveSpeechTranscriberView(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isListening) stringResource(R.string.lyrics_transcribing_live) else "Transcripción pausada",
+                        text = if (isListening) "Escuchando en ${selectedLanguage.displayName} ${selectedLanguage.flag}" else "Transcripción pausada",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = if (isListening) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
@@ -226,7 +271,7 @@ fun LiveSpeechTranscriberView(
                         OutlinedButton(
                             onClick = { LiveSpeechTranscriber.clear() },
                             modifier = Modifier.height(32.dp),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                         ) {
                             Text("Limpiar", style = MaterialTheme.typography.labelSmall)
                         }
@@ -235,7 +280,7 @@ fun LiveSpeechTranscriberView(
                     FilledTonalButton(
                         onClick = toggleListening,
                         modifier = Modifier.height(32.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                     ) {
                         Text(
                             text = if (isListening) stringResource(R.string.live_transcription_stop) else "Reanudar",
@@ -247,43 +292,92 @@ fun LiveSpeechTranscriberView(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                items(lines) { line ->
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                        modifier = Modifier.fillMaxWidth(),
+            if (lines.isEmpty() && partial.isBlank() && isListening) {
+                // Interactive waiting state with sound level visualizer
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(24.dp),
                     ) {
+                        val micScale = 1f + (soundLevel * 0.4f)
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .scale(micScale)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                    shape = CircleShape,
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_mic_wave),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(36.dp),
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = line,
-                            style = MaterialTheme.typography.titleMedium.copy(lineHeight = 28.sp),
-                            fontWeight = FontWeight.Medium,
+                            text = "Escuchando audio...",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(14.dp),
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Esperando que comience la voz o música en ${selectedLanguage.displayName} (${selectedLanguage.flag}). Mantén buen volumen o habla cerca del micrófono para que el sonido no sea filtrado por la cancelación de ruido.",
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
-
-                if (partial.isNotBlank()) {
-                    item {
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(lines) { line ->
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
-                                text = "… $partial",
+                                text = line,
                                 style = MaterialTheme.typography.titleMedium.copy(lineHeight = 28.sp),
-                                fontWeight = FontWeight.Normal,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.padding(14.dp),
                             )
+                        }
+                    }
+
+                    if (partial.isNotBlank()) {
+                        item {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(
+                                    text = "… $partial",
+                                    style = MaterialTheme.typography.titleMedium.copy(lineHeight = 28.sp),
+                                    fontWeight = FontWeight.Normal,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(14.dp),
+                                )
+                            }
                         }
                     }
                 }

@@ -1965,7 +1965,10 @@ class MusicService :
             ) {
                 uriStr = "https://live-ar1.cdnrad.com/hls/radio-285/live.m3u8"
             }
-            val isHls = mediaId.startsWith("tv:") || uriStr.contains(".m3u8", ignoreCase = true) || uriStr.contains("hls", ignoreCase = true)
+            val isHls = uriStr.contains(".m3u8", ignoreCase = true) ||
+                uriStr.contains("/hls/", ignoreCase = true) ||
+                uriStr.contains("hls", ignoreCase = true) ||
+                uriStr.contains("manifest.googlevideo.com", ignoreCase = true)
             if (isHls && item.localConfiguration?.mimeType != androidx.media3.common.MimeTypes.APPLICATION_M3U8) {
                 return item.buildUpon()
                     .setUri(uriStr.toUri())
@@ -4672,18 +4675,22 @@ class MusicService :
             }
 
             // 2. Radio or TV stream URI scheme (radio:https://... or tv:https://...)
-            if (uriString.startsWith("radio:") || dataSpec.key?.startsWith("radio:") == true ||
-                uriString.startsWith("tv:") || dataSpec.key?.startsWith("tv:") == true) {
+            val isRadioScheme = uriString.startsWith("radio:") || dataSpec.key?.startsWith("radio:") == true
+            val isTvScheme = uriString.startsWith("tv:") || dataSpec.key?.startsWith("tv:") == true
+            val isYtWatch = uriString.contains("youtube.com/watch") || uriString.contains("youtu.be/")
+
+            if (isRadioScheme || isTvScheme || isYtWatch) {
                 var streamUrl = when {
                     uriString.startsWith("radio:") -> uriString.removePrefix("radio:")
                     uriString.startsWith("tv:") -> uriString.removePrefix("tv:")
                     dataSpec.key?.startsWith("radio:") == true -> dataSpec.key!!.removePrefix("radio:")
-                    else -> dataSpec.key!!.removePrefix("tv:")
+                    dataSpec.key?.startsWith("tv:") == true -> dataSpec.key!!.removePrefix("tv:")
+                    else -> uriString
                 }
                 if (streamUrl.contains("cdn.instream.audio:9714") || streamUrl.contains("solumedia.com.ar/urbanaplay") || streamUrl.contains("cdn.instream.audio:9660") || streamUrl.contains("vmf.edge-apps.net/playlist/urbana")) {
                     streamUrl = "https://live-ar1.cdnrad.com/hls/radio-285/live.m3u8"
                 }
-                if (uriString.startsWith("tv:") || dataSpec.key?.startsWith("tv:") == true) {
+                if (isTvScheme || isYtWatch) {
                     val videoId = when {
                         streamUrl.contains("watch?v=") -> streamUrl.substringAfter("watch?v=").substringBefore("&").substringBefore("?")
                         streamUrl.contains("youtu.be/") -> streamUrl.substringAfter("youtu.be/").substringBefore("?").substringBefore("&")
@@ -4696,26 +4703,7 @@ class MusicService :
                         }
                         if (hlsManifest != null) {
                             streamUrl = hlsManifest
-                        } else {
-                            val extracted = runBlocking(Dispatchers.IO) {
-                                InnerTubeXPlayer.playerResponseForPlayback(
-                                    videoId = videoId,
-                                    audioQuality = audioQuality,
-                                    connectivityManager = connectivityManager,
-                                ).getOrNull()?.streamUrl
-                            }
-                            if (extracted != null) {
-                                streamUrl = extracted
-                            }
                         }
-                    }
-                    // Prevent ExoPlayer from attempting to parse raw YouTube HTML pages as media files
-                    if (streamUrl.contains("youtube.com/watch?v=") || streamUrl.contains("youtu.be/")) {
-                        throw PlaybackException(
-                            "La señal en vivo no está disponible en este momento.",
-                            null,
-                            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-                        )
                     }
                 }
                 return@Factory dataSpec.buildUpon()

@@ -606,7 +606,11 @@ private fun ThumbnailItem(
                 .clip(RoundedCornerShape(dimensions.cornerRadius))
         ) {
             val isCurrentPlaying = item.mediaId == currentMediaId
-            val isHls = item.mediaId.contains(".m3u8", ignoreCase = true) || item.mediaId.contains("/hls/", ignoreCase = true)
+            val isHls = item.mediaId.contains(".m3u8", ignoreCase = true) ||
+                item.mediaId.contains("/hls/", ignoreCase = true) ||
+                item.mediaId.contains("hls", ignoreCase = true) ||
+                item.mediaId.contains("manifest.googlevideo.com", ignoreCase = true) ||
+                playerConnection.player.currentMediaItem?.localConfiguration?.mimeType == androidx.media3.common.MimeTypes.APPLICATION_M3U8
             val ytVideoId = when {
                 item.mediaId.startsWith("tv:") -> {
                     val tvContent = item.mediaId.removePrefix("tv:")
