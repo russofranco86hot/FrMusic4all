@@ -5,11 +5,14 @@
 
 package com.metrolist.music.ui.player
 
+import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.runtime.key
+import androidx.compose.ui.draw.alpha
+import com.metrolist.music.LocalIsWatch
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -140,19 +143,22 @@ private fun calculateThumbnailDimensions(
     containerHeight: Dp = containerWidth,
     horizontalPadding: Dp = PlayerHorizontalPadding,
     cornerRadius: Dp = ThumbnailCornerRadius,
-    isLandscape: Boolean = false
+    isLandscape: Boolean = false,
+    isWatch: Boolean = false,
 ): ThumbnailDimensions {
-    // In landscape, use height as the constraining dimension for a square thumbnail
-    val effectiveSize = if (isLandscape) {
-        minOf(containerWidth, containerHeight) - (horizontalPadding * 2)
+    val effectiveHorizontalPadding = if (isWatch) 10.dp else horizontalPadding
+    val effectiveSize = if (isWatch) {
+        minOf(containerWidth, containerHeight) * 0.52f
+    } else if (isLandscape) {
+        minOf(containerWidth, containerHeight) - (effectiveHorizontalPadding * 2)
     } else {
-        containerWidth - (horizontalPadding * 2)
+        containerWidth - (effectiveHorizontalPadding * 2)
     }
     return ThumbnailDimensions(
         itemWidth = containerWidth,
         containerSize = containerWidth,
         thumbnailSize = effectiveSize,
-        cornerRadius = cornerRadius * 2
+        cornerRadius = if (isWatch) 16.dp else cornerRadius * 2
     )
 }
 
@@ -380,12 +386,14 @@ fun Thumbnail(
                         Modifier.fillMaxSize()
                     }
                 ) {
-                    // Calculate dimensions once per size change, considering landscape mode
-                    val dimensions = remember(maxWidth, maxHeight, isLandscape) {
+                    // Calculate dimensions once per size change, considering landscape mode and watch mode
+                    val isWatch = LocalIsWatch.current
+                    val dimensions = remember(maxWidth, maxHeight, isLandscape, isWatch) {
                         calculateThumbnailDimensions(
                             containerWidth = maxWidth,
                             containerHeight = maxHeight,
-                            isLandscape = isLandscape
+                            isLandscape = isLandscape,
+                            isWatch = isWatch,
                         )
                     }
 
@@ -537,17 +545,11 @@ private fun ThumbnailItem(
     val incrementalSeekSkipEnabled by rememberPreference(SeekExtraSeconds, defaultValue = false)
     var skipMultiplier by remember { mutableIntStateOf(1) }
     var lastTapTime by remember { mutableLongStateOf(0L) }
-    var isVideoMode by remember(item.mediaId) { mutableStateOf(false) }
-
-    LaunchedEffect(isVideoMode, item.mediaId, currentMediaId) {
-        if (item.mediaId == currentMediaId) {
-            val currentParams = playerConnection.player.trackSelectionParameters
-            val updatedParams = currentParams.buildUpon()
-                .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, !isVideoMode)
-                .build()
-            playerConnection.player.trackSelectionParameters = updatedParams
-        }
-    }
+    val currentMediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isTvChannel = item.mediaId.startsWith("tv:") ||
+            item.mediaMetadata.title?.startsWith("TV:") == true ||
+            (currentMediaMetadata?.artists?.any { it.name == "Streaming" || it.name == "Noticias & Aire" } == true)
+    var isVideoMode by remember(item.mediaId) { mutableStateOf(isTvChannel) }
 
     Box(
         modifier = modifier
@@ -562,8 +564,8 @@ private fun ThumbnailItem(
             )
             .padding(horizontal = PlayerHorizontalPadding)
             .graphicsLayer {
-                // Render entire thumbnail item on separate hardware layer for smooth animations
-                compositingStrategy = CompositingStrategy.Offscreen
+                // When in video mode, avoid offscreen compositing to ensure smooth hardware decoding
+                compositingStrategy = if (isVideoMode) CompositingStrategy.Auto else CompositingStrategy.Offscreen
             }
             .pointerInput(Unit) {
                 detectTapGestures(
@@ -603,18 +605,32 @@ private fun ThumbnailItem(
                 .size(dimensions.thumbnailSize)
                 .clip(RoundedCornerShape(dimensions.cornerRadius))
         ) {
+            val isCurrentPlaying = item.mediaId == currentMediaId
+            val isHls = item.mediaId.contains(".m3u8", ignoreCase = true) || item.mediaId.contains("/hls/", ignoreCase = true)
+            val ytVideoId = when {
+                item.mediaId.startsWith("tv:") -> {
+                    val tvContent = item.mediaId.removePrefix("tv:")
+                    when {
+                        tvContent.contains("watch?v=") -> tvContent.substringAfter("watch?v=").substringBefore("&").substringBefore("?")
+                        tvContent.contains("youtu.be/") -> tvContent.substringAfter("youtu.be/").substringBefore("?").substringBefore("&")
+                        tvContent.length == 11 && !tvContent.contains("/") -> tvContent
+                        else -> null
+                    }
+                }
+                item.mediaId.length == 11 && !item.mediaId.startsWith("radio:") && !item.mediaId.startsWith("local:") && !item.mediaId.contains("/") -> item.mediaId
+                else -> null
+            }
+            val isYouTubeVideoId = ytVideoId != null && ytVideoId.length == 11
+
             if (hidePlayerThumbnail) {
                 HiddenThumbnailPlaceholder(textBackgroundColor = textBackgroundColor)
-            } else if (isVideoMode && item.mediaId == currentMediaId) {
-                val isHls = item.mediaId.startsWith("tv:http") || item.mediaId.contains(".m3u8", ignoreCase = true)
-                if (isHls || playerConnection.player.videoFormat != null) {
+            } else if (isCurrentPlaying && (isHls || playerConnection.player.videoFormat != null)) {
+                if (isVideoMode) {
                     AndroidView(
                         factory = { ctx ->
-                            PlayerView(ctx).apply {
-                                player = playerConnection.player
-                                useController = false
-                                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                            }
+                            val view = LayoutInflater.from(ctx).inflate(R.layout.exo_texture_player_view, null, false) as PlayerView
+                            view.player = playerConnection.player
+                            view
                         },
                         update = { view ->
                             if (view.player !== playerConnection.player) {
@@ -624,85 +640,130 @@ private fun ThumbnailItem(
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
-                    val rawVideoId = item.mediaId.removePrefix("tv:")
-                    val videoId = if (rawVideoId.length == 11 && !rawVideoId.startsWith("radio:") && !rawVideoId.startsWith("local:")) rawVideoId else null
-                    if (videoId != null) {
-                        key(videoId) {
-                            AndroidView(
-                                factory = { ctx ->
-                                    WebView(ctx).apply {
-                                        layoutParams = ViewGroup.LayoutParams(
-                                            ViewGroup.LayoutParams.MATCH_PARENT,
-                                            ViewGroup.LayoutParams.MATCH_PARENT,
-                                        )
-                                        settings.apply {
-                                            javaScriptEnabled = true
-                                            domStorageEnabled = true
-                                            mediaPlaybackRequiresUserGesture = false
-                                            loadWithOverviewMode = true
-                                            useWideViewPort = true
-                                        }
-                                        setBackgroundColor(android.graphics.Color.BLACK)
-                                        webViewClient = WebViewClient()
-                                        webChromeClient = WebChromeClient()
-                                        val html = """
-                                            <!DOCTYPE html>
-                                            <html>
-                                            <head>
-                                            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-                                            <style>
-                                                * { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background-color:#000; }
-                                                iframe { position:absolute; top:0; left:0; width:100%; height:100%; border:0; }
-                                            </style>
-                                            </head>
-                                            <body>
-                                            <iframe 
-                                                id="ytplayer"
-                                                src="https://www.youtube-nocookie.com/embed/$videoId?autoplay=1&playsinline=1&controls=0&mute=1&rel=0&modestbranding=1&enablejsapi=1" 
-                                                allow="autoplay; encrypted-media; picture-in-picture" 
-                                                allowfullscreen>
-                                            </iframe>
-                                            </body>
-                                            </html>
-                                        """.trimIndent()
-                                        loadDataWithBaseURL("https://www.youtube.com", html, "text/html", "UTF-8", null)
-                                    }
-                                },
-                                update = { webView ->
-                                    val isPlaying = playerConnection.player.isPlaying
-                                    val jsCommand = if (isPlaying) {
-                                        "var p = document.getElementById('ytplayer'); if (p && p.contentWindow) { p.contentWindow.postMessage('{\"event\":\"command\",\"func\":\"playVideo\",\"args\":\"\"}', '*'); }"
-                                    } else {
-                                        "var p = document.getElementById('ytplayer'); if (p && p.contentWindow) { p.contentWindow.postMessage('{\"event\":\"command\",\"func\":\"pauseVideo\",\"args\":\"\"}', '*'); }"
-                                    }
-                                    webView.evaluateJavascript(jsCommand, null)
-                                },
-                                onRelease = { webView ->
-                                    webView.destroy()
-                                },
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
+                    val artworkUriToUse = if (!currentMediaThumbnail.isNullOrBlank()) {
+                        currentMediaThumbnail
                     } else {
+                        item.mediaMetadata.artworkUri?.toString()
+                    }
+                    ThumbnailImage(
+                        artworkUri = artworkUriToUse,
+                        cropArtwork = cropAlbumArt
+                    )
+                }
+            } else if (isCurrentPlaying && isYouTubeVideoId) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    key(ytVideoId) {
                         AndroidView(
                             factory = { ctx ->
-                                PlayerView(ctx).apply {
-                                    player = playerConnection.player
-                                    useController = false
-                                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                WebView(ctx).apply {
+                                    layoutParams = ViewGroup.LayoutParams(
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                    )
+                                    setBackgroundColor(android.graphics.Color.BLACK)
+                                    settings.apply {
+                                        javaScriptEnabled = true
+                                        domStorageEnabled = true
+                                        mediaPlaybackRequiresUserGesture = false
+                                        loadWithOverviewMode = true
+                                        useWideViewPort = true
+                                        databaseEnabled = true
+                                        userAgentString = "Mozilla/5.0 (Linux; Android 14; SM-S931B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"
+                                    }
+
+                                    val css = """
+                                        header, #header, ytm-header, ytm-pivot-bar-renderer, .pivot-bar,
+                                        #comments, ytm-comment-section-renderer, #related, ytm-item-section-renderer,
+                                        .engagement-panel, ytm-engagement-panel-section-list-renderer,
+                                        ytm-mobile-topbar-renderer, ytm-app #header, .ghost-header,
+                                        ytm-playlist-panel-renderer, ytm-reel-shelf-renderer,
+                                        ytm-feed-filter-chip-bar-renderer, ytm-item-section-header-renderer {
+                                            display: none !important;
+                                        }
+                                        body, html, ytm-app, #app {
+                                            background-color: #000000 !important;
+                                            overflow: hidden !important;
+                                            margin: 0 !important;
+                                            padding: 0 !important;
+                                            width: 100vw !important;
+                                            height: 100vh !important;
+                                        }
+                                        #player-container-id, .player-container, #player, .html5-video-player, video {
+                                            position: fixed !important;
+                                            top: 0 !important;
+                                            left: 0 !important;
+                                            width: 100vw !important;
+                                            height: 100vh !important;
+                                            z-index: 999999 !important;
+                                            object-fit: contain !important;
+                                            background: #000 !important;
+                                        }
+                                    """.trimIndent().replace("\n", " ")
+
+                                    val injectJs = """
+                                        (function() {
+                                            var style = document.getElementById('frmusic-yt-style');
+                                            if (!style) {
+                                                style = document.createElement('style');
+                                                style.id = 'frmusic-yt-style';
+                                                style.type = 'text/css';
+                                                style.innerHTML = '$css';
+                                                document.head.appendChild(style);
+                                            }
+                                            function ensurePlay() {
+                                                var v = document.querySelector('video');
+                                                if (v && v.paused) {
+                                                    v.play().catch(function(){});
+                                                }
+                                            }
+                                            ensurePlay();
+                                            setInterval(ensurePlay, 1000);
+                                        })();
+                                    """.trimIndent()
+
+                                    webChromeClient = WebChromeClient()
+                                    webViewClient = object : WebViewClient() {
+                                        override fun onPageFinished(view: WebView?, url: String?) {
+                                            super.onPageFinished(view, url)
+                                            view?.evaluateJavascript(injectJs, null)
+                                        }
+                                    }
+
+                                    loadUrl("https://m.youtube.com/watch?v=$ytVideoId")
                                 }
                             },
-                            update = { view ->
-                                if (view.player !== playerConnection.player) {
-                                    view.player = playerConnection.player
+                            update = { webView ->
+                                val isPlaying = playerConnection.player.isPlaying
+                                val jsCommand = if (isPlaying) {
+                                    "(function(){ var v = document.querySelector('video'); if (v && v.paused) v.play(); })()"
+                                } else {
+                                    "(function(){ var v = document.querySelector('video'); if (v && !v.paused) v.pause(); })()"
                                 }
+                                webView.evaluateJavascript(jsCommand, null)
                             },
-                            modifier = Modifier.fillMaxSize(),
+                            onRelease = { webView ->
+                                webView.stopLoading()
+                                webView.loadUrl("about:blank")
+                                webView.destroy()
+                            },
+                            modifier = if (isVideoMode) Modifier.fillMaxSize() else Modifier.size(1.dp).alpha(0.01f),
+                        )
+                    }
+
+                    if (!isVideoMode) {
+                        val artworkUriToUse = if (!currentMediaThumbnail.isNullOrBlank()) {
+                            currentMediaThumbnail
+                        } else {
+                            item.mediaMetadata.artworkUri?.toString()
+                        }
+                        ThumbnailImage(
+                            artworkUri = artworkUriToUse,
+                            cropArtwork = cropAlbumArt
                         )
                     }
                 }
             } else {
-                val artworkUriToUse = if (item.mediaId == currentMediaId && !currentMediaThumbnail.isNullOrBlank()) {
+                val artworkUriToUse = if (isCurrentPlaying && !currentMediaThumbnail.isNullOrBlank()) {
                     currentMediaThumbnail
                 } else {
                     item.mediaMetadata.artworkUri?.toString()
@@ -714,8 +775,9 @@ private fun ThumbnailItem(
                 )
             }
 
-            // Video / Solo Audio Mode Toggle (for currently playing item)
-            if (item.mediaId == currentMediaId) {
+            // Video / Solo Audio Mode Toggle (for currently playing TV/video item)
+            val showVideoToggle = isCurrentPlaying && (isTvChannel || playerConnection.player.videoFormat != null || isYouTubeVideoId)
+            if (showVideoToggle) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = Color.Black.copy(alpha = 0.65f),

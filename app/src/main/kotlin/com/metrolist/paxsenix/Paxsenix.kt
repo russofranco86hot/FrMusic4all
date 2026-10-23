@@ -280,48 +280,63 @@ object Paxsenix {
         val targetIsRemix = title.contains("remix", ignoreCase = true)
         
         return results.map { result ->
-            var score = 0.0
-            
             val resultTitle = result.displayName
             val resultArtist = result.displayArtist
-            
+            val resultTitleCleaned = resultTitle.replace(cleanupRegex, "").lowercase().trim()
+
+            val targetWords = cleanedTitle.split(Regex("[^\\p{L}\\p{Nd}]+")).filter { it.length >= 3 }.toSet()
+            val resultWords = resultTitleCleaned.split(Regex("[^\\p{L}\\p{Nd}]+")).filter { it.length >= 3 }.toSet()
+            val wordOverlap = if (targetWords.isNotEmpty() && resultWords.isNotEmpty()) {
+                targetWords.intersect(resultWords).size.toDouble() / maxOf(targetWords.size, resultWords.size)
+            } else 0.0
+
+            var titleScore = 0.0
+            when {
+                resultTitleCleaned == cleanedTitle -> titleScore = 100.0
+                wordOverlap >= 0.7 -> titleScore = 80.0
+                wordOverlap >= 0.5 -> titleScore = 50.0
+                resultTitleCleaned.contains(cleanedTitle) || cleanedTitle.contains(resultTitleCleaned) -> {
+                    val ratio = minOf(resultTitleCleaned.length, cleanedTitle.length).toDouble() / maxOf(resultTitleCleaned.length, cleanedTitle.length)
+                    if (ratio >= 0.6) titleScore = 40.0
+                }
+            }
+
+            // CRITICAL: A track MUST match the title. Duration alone is NEVER enough!
+            if (titleScore == 0.0) {
+                return@map result to -100.0
+            }
+
+            var score = titleScore
+
             result.duration?.let { d ->
                 val diff = abs(d - durationMs)
                 when {
-                    diff <= 2000 -> score += 100 // Excellent match
-                    diff <= 5000 -> score += 50  // Good match
-                    diff <= 10000 -> score += 10 // Acceptable match
-                    else -> score -= 50          // Likely wrong version (Mixed/Edit/etc)
+                    diff <= 2000 -> score += 30
+                    diff <= 5000 -> score += 15
+                    diff <= 10000 -> score += 5
+                    else -> score -= 30
                 }
             }
-            
-            val resultTitleCleaned = resultTitle.replace(cleanupRegex, "").lowercase().trim()
-            
-            when {
-                resultTitleCleaned == cleanedTitle -> score += 80
-                resultTitleCleaned.contains(cleanedTitle) || cleanedTitle.contains(resultTitleCleaned) -> score += 40
-            }
-            
+
             // Penalize version mismatch
             val resultIsMixed = resultTitle.contains("mixed", ignoreCase = true)
             val resultIsRemix = resultTitle.contains("remix", ignoreCase = true)
-            
-            if (resultIsMixed && !targetIsMixed) score -= 60
-            if (resultIsRemix && !targetIsRemix) score -= 40
-            
+            if (resultIsMixed && !targetIsMixed) score -= 40
+            if (resultIsRemix && !targetIsRemix) score -= 30
+
             val resultArtistLower = resultArtist.lowercase()
             val targetArtistPrimary = cleanedArtist
-            
             when {
-                resultArtistLower.contains(targetArtistPrimary) -> score += 50
+                resultArtistLower == targetArtistPrimary -> score += 50
+                resultArtistLower.contains(targetArtistPrimary) || targetArtistPrimary.contains(resultArtistLower) -> score += 30
                 else -> {
-                    val artistWords = targetArtistPrimary.split(Regex("\\s+")).filter { it.length > 2 }
+                    val artistWords = targetArtistPrimary.split(Regex("[^\\p{L}\\p{Nd}]+")).filter { it.length > 2 }
                     if (artistWords.any { resultArtistLower.contains(it) }) {
-                        score += 25
+                        score += 15
                     }
                 }
             }
-            
+
             Timber.v("  Score for '${resultTitle}': $score")
             result to score
         }.sortedByDescending { it.second }.filter { it.second > 0 }.take(10)

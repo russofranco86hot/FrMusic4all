@@ -1228,10 +1228,10 @@
     <string name="spotify_connect_echo_hint">Make sure your Amazon Echo is on the same Wi-Fi, or say “Alexa, Spotify Connect” to activate it.</string>
 
     <!-- Radio feature strings -->
-    <string name="radio_tab_favorites">Favorites</string>
-    <string name="radio_tab_top">Top</string>
-    <string name="radio_tab_countries">Countries</string>
-    <string name="radio_tab_genres">Genres</string>
+    <string name="radio_tab_favorites">Favoritos</string>
+    <string name="radio_tab_top">Más escuchadas</string>
+    <string name="radio_tab_countries">Países</string>
+    <string name="radio_tab_genres">Géneros</string>
     <string name="radio_search_hint">Search radio stations…</string>
     <string name="radio_export_favorites">Export M3U</string>
     <string name="radio_import_favorites">Import M3U</string>
@@ -1247,6 +1247,11 @@
     <string name="radio_loading">Loading stations…</string>
     <string name="radio_all_countries">All Countries</string>
     <string name="radio_all_genres">All Genres</string>
+    <string name="radio_sort_by">Ordenar por:</string>
+    <string name="radio_sort_most_listened">Más escuchadas</string>
+    <string name="radio_sort_most_voted">Más votadas</string>
+    <string name="radio_sort_name">Nombre</string>
+    <string name="radio_sort_bitrate">Calidad</string>
 
     <!-- Bluetooth & Watch audio routing -->
     <string name="bluetooth_and_watch_title">Smartwatch &amp; Bluetooth Devices</string>
@@ -1273,12 +1278,44 @@
     <string name="tv_audio_only_active">Audio-only mode (battery saver)</string>
     <string name="tv_channel_offline">Channel is not broadcasting live right now</string>
     <string name="tv_search_hint">Search channels (Luzu, Olga, TN, C5N…)…</string>
+    <string name="tv_add_channel">Add custom channel</string>
+    <string name="tv_add_channel_title">Add Channel or Stream</string>
+    <string name="tv_channel_name_hint">Channel name (e.g. My Channel)</string>
+    <string name="tv_channel_url_hint">Handle (@user), YouTube URL or .m3u8</string>
+    <string name="tv_add">Add</string>
+    <string name="tv_delete_channel">Delete channel</string>
+    <string name="tv_youtube_live_results">YouTube Live streams</string>
 
     <!-- Live Speech Recognition / Transcriber -->
-    <string name="live_transcription_title">Live Voice Recognition</string>
-    <string name="live_transcription_desc">Transcribe spoken words in real time</string>
-    <string name="live_transcription_listening">Listening and transcribing live…</string>
-    <string name="live_transcription_permission_needed">Microphone permission is needed to transcribe live audio</string>
-    <string name="live_transcription_start">Start Live Transcription</string>
-    <string name="live_transcription_stop">Stop Transcription</string>
+    <string name="live_transcription_title">Reconocimiento de voz en vivo</string>
+    <string name="live_transcription_desc">Transcribe palabras habladas en tiempo real</string>
+    <string name="live_transcription_listening">Escuchando y transcribiendo en vivo…</string>
+    <string name="live_transcription_permission_needed">Se necesita permiso de micrófono para transcribir audio en vivo</string>
+    <string name="live_transcription_start">Iniciar transcripción en vivo</string>
+    <string name="live_transcription_stop">Detener transcripción</string>
+
+    <!-- Radio Recordings & Auto -->
+    <string name="radio_record">Record</string>
+    <string name="radio_recording">Recording…</string>
+    <string name="radio_stop_recording">Stop Recording</string>
+    <string name="radio_recordings">Radio Recordings</string>
+    <string name="radio_recording_saved">Recording saved: %s</string>
+    <string name="radio_recording_deleted">Recording deleted</string>
+    <string name="radio_delete_recording_confirm">Delete this recording?</string>
+    <string name="radio_no_recordings">No radio recordings yet</string>
+    <string name="radio_start_recording">Start recording radio</string>
+    <string name="radio_tab_recordings">Grabaciones</string>
+    <string name="radio_countries">Países</string>
+    <string name="radio_top_stations">Más escuchadas</string>
+    <string name="radio_favorites">Estaciones favoritas</string>
+
+    <!-- Fallback Live Speech Transcription for Lyrics -->
+    <string name="lyrics_transcribing_live">Transcribiendo voz en vivo…</string>
+    <string name="lyrics_transcribing_hint">Escuchando audio para generar texto en tiempo real…</string>
+
+    <!-- File details -->
+    <string name="file_path">File path</string>
+    <string name="local_file_details">Local File Details</string>
+    <string name="album">Album</string>
+    <string name="duration">Duration</string>
 </resources>

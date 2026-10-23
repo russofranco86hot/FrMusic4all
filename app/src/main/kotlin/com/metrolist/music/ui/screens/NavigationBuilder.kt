@@ -81,7 +81,12 @@ fun NavGraphBuilder.navigationBuilder(
     snackbarHostState: SnackbarHostState,
 ) {
     composable(Screens.Home.route) {
-        HomeScreen(snackbarHostState = snackbarHostState)
+        val isWatch = com.metrolist.music.LocalIsWatch.current
+        if (isWatch) {
+            WatchMainPager(snackbarHostState = snackbarHostState)
+        } else {
+            HomeScreen(snackbarHostState = snackbarHostState)
+        }
     }
 
     composable(Screens.Search.route) { backStackEntry ->

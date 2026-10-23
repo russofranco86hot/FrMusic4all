@@ -62,6 +62,9 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlin.math.roundToInt
 
 enum class AndroidAutoSection(val id: String) {
+    RADIO("radio"),
+    STREAMING("streaming"),
+    LOCAL("local"),
     SPOTIFY_LIKED("spotify_liked"),
     SPOTIFY_PLAYLISTS("spotify_playlists"),
     LIKED("liked"),
@@ -73,6 +76,9 @@ enum class AndroidAutoSection(val id: String) {
 
 @Composable
 fun AndroidAutoSection.label(): String = when (this) {
+    AndroidAutoSection.RADIO -> stringResource(R.string.radio)
+    AndroidAutoSection.STREAMING -> stringResource(R.string.tv_streaming)
+    AndroidAutoSection.LOCAL -> stringResource(R.string.local_files)
     AndroidAutoSection.LIKED -> stringResource(R.string.liked_songs)
     AndroidAutoSection.SONGS -> stringResource(R.string.songs)
     AndroidAutoSection.ARTISTS -> stringResource(R.string.artists)
@@ -94,12 +100,12 @@ fun deserializeSections(raw: String): List<Pair<AndroidAutoSection, Boolean>> {
         val enabled = parts[1].toBooleanStrictOrNull() ?: true
         section to enabled
     }
-    // Append any new enum values not yet in the user's saved preferences
+    // Prepend any new enum values (e.g. RADIO, STREAMING, LOCAL) so they are immediately visible at the top in Android Auto!
     val known = parsed.map { it.first }.toSet()
     val newSections = AndroidAutoSection.values()
         .filter { it !in known }
         .map { it to true }
-    return parsed + newSections
+    return newSections + parsed
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -211,6 +217,9 @@ fun AndroidAutoSettings(
                             Material3SettingsItem(
                                 icon = painterResource(
                                     when (section) {
+                                        AndroidAutoSection.RADIO -> R.drawable.radio
+                                        AndroidAutoSection.STREAMING -> R.drawable.ic_tv
+                                        AndroidAutoSection.LOCAL -> R.drawable.download
                                         AndroidAutoSection.LIKED -> R.drawable.favorite
                                         AndroidAutoSection.SONGS -> R.drawable.music_note
                                         AndroidAutoSection.ARTISTS -> R.drawable.artist

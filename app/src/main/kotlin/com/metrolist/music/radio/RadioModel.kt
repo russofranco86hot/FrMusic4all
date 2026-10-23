@@ -55,13 +55,20 @@ data class RadioStation(
     }
 
     fun toMediaItem(): MediaItem {
-        val stream = streamUrl
+        var stream = streamUrl
+        if (stream.contains("cdn.instream.audio:9714") ||
+            stream.contains("solumedia.com.ar/urbanaplay") ||
+            stream.contains("cdn.instream.audio:9660") ||
+            stream.contains("vmf.edge-apps.net/playlist/urbana")
+        ) {
+            stream = "https://live-ar1.cdnrad.com/hls/radio-285/live.m3u8"
+        }
         val isHls = stream.contains(".m3u8", ignoreCase = true) || stream.contains("hls", ignoreCase = true)
         val metadata = toMediaMetadata()
         val artistNames = metadata.artists.joinToString { it.name }
 
         return MediaItem.Builder()
-            .setMediaId(metadata.id)
+            .setMediaId("radio:$stream")
             .setUri(stream)
             .setCustomCacheKey(null)
             .setLiveConfiguration(

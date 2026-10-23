@@ -5,6 +5,9 @@
 
 package com.metrolist.music.tv
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class TvChannel(
     val id: String,
     val name: String,
@@ -13,10 +16,13 @@ data class TvChannel(
     val youtubeHandle: String? = null,
     val channelId: String? = null,
     val directStreamUrl: String? = null,
-    val logoUrl: String,
+    val fallbackVideoId: String? = null,
+    val logoUrl: String = "",
     val isFavorite: Boolean = false,
+    val isCustom: Boolean = false,
 )
 
+@Serializable
 enum class TvCategory(val displayName: String) {
     STREAMING("Streaming"),
     NEWS("Noticias & Aire"),

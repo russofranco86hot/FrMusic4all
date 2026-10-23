@@ -13,6 +13,7 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
@@ -29,7 +30,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.zIndex
+import androidx.compose.runtime.mutableFloatStateOf
+import com.metrolist.music.ui.component.WatchTabIndicator
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -601,11 +607,17 @@ class MainActivity : FragmentActivity() {
             }
         }
 
+        val isWatch = remember {
+            packageManager.hasSystemFeature(PackageManager.FEATURE_WATCH) ||
+            (resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_WATCH ||
+            resources.configuration.isScreenRound
+        }
+
         val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
         val isSystemInDarkTheme = isSystemInDarkTheme()
         val useDarkTheme =
-            remember(darkTheme, isSystemInDarkTheme) {
-                if (darkTheme == DarkMode.AUTO) isSystemInDarkTheme else darkTheme == DarkMode.ON
+            remember(darkTheme, isSystemInDarkTheme, isWatch) {
+                if (isWatch) true else if (darkTheme == DarkMode.AUTO) isSystemInDarkTheme else darkTheme == DarkMode.ON
             }
 
         LaunchedEffect(useDarkTheme) {
@@ -616,8 +628,8 @@ class MainActivity : FragmentActivity() {
         val userDensityScale by rememberPreference(DensityScaleKey, defaultValue = 1f)
         val pureBlackEnabled by rememberPreference(PureBlackKey, defaultValue = false)
         val pureBlack =
-            remember(pureBlackEnabled, useDarkTheme) {
-                pureBlackEnabled && useDarkTheme
+            remember(pureBlackEnabled, useDarkTheme, isWatch) {
+                isWatch || (pureBlackEnabled && useDarkTheme)
             }
 
         val (selectedThemeColorInt) = rememberPreference(SelectedThemeColorKey, defaultValue = DefaultThemeColor.toArgb())
@@ -755,7 +767,6 @@ class MainActivity : FragmentActivity() {
                     navigationItems.mapIndexed { i, s -> s.route to i }.toMap()
                 }
                 val (userSlimNav) = rememberPreference(SlimNavBarKey, defaultValue = false)
-                val isWatch = remember { packageManager.hasSystemFeature(PackageManager.FEATURE_WATCH) }
                 val slimNav = userSlimNav || isWatch
                 val (useNewMiniPlayerDesign) = rememberPreference(UseNewMiniPlayerDesignKey, defaultValue = true)
                 val (defaultOpenTabInt) = rememberPreference(DefaultOpenTabKey, defaultValue = NavigationTab.HOME.name)
@@ -825,16 +836,18 @@ class MainActivity : FragmentActivity() {
                     }
 
                 val shouldShowNavigationBar =
-                    remember(currentRoute, navigationItemRoutes) {
-                        currentRoute == null ||
-                            navigationItemRoutes.contains(currentRoute) ||
-                            currentRoute!!.startsWith("search/")
+                    remember(currentRoute, navigationItemRoutes, isWatch) {
+                        if (isWatch) false else (
+                            currentRoute == null ||
+                                navigationItemRoutes.contains(currentRoute) ||
+                                currentRoute!!.startsWith("search/")
+                        )
                     }
 
                 val isLandscape = configuration.containerDpSize.width > configuration.containerDpSize.height
                 val isTablet = configuration.containerDpSize.width >= 600.dp
 
-                val showRail = (isLandscape || isTablet) && !inSearchScreen
+                val showRail = (isLandscape || isTablet) && !inSearchScreen && !isWatch
 
                 val navPadding =
                     if (shouldShowNavigationBar && !showRail) {
@@ -843,11 +856,15 @@ class MainActivity : FragmentActivity() {
                         0.dp
                     }
 
+                val targetNavBarHeight = NavigationBarHeight
                 val navigationBarHeight by animateDpAsState(
-                    targetValue = if (shouldShowNavigationBar && !showRail) NavigationBarHeight else 0.dp,
+                    targetValue = if (shouldShowNavigationBar && !showRail) targetNavBarHeight else 0.dp,
                     animationSpec = NavigationBarAnimationSpec,
                     label = "navBarHeight",
                 )
+
+                val effectiveMiniPlayerHeight = if (isWatch) 40.dp else MiniPlayerHeight
+                val effectiveMiniPlayerBottomSpacing = if (isWatch) 2.dp else if (useNewMiniPlayerDesign) MiniPlayerBottomSpacing else 0.dp
 
                 val playerBottomSheetState =
                     rememberBottomSheetState(
@@ -855,8 +872,8 @@ class MainActivity : FragmentActivity() {
                         collapsedBound =
                             bottomInset +
                                 (if (!showRail && shouldShowNavigationBar) navPadding else 0.dp) +
-                                (if (useNewMiniPlayerDesign) MiniPlayerBottomSpacing else 0.dp) +
-                                MiniPlayerHeight,
+                                effectiveMiniPlayerBottomSpacing +
+                                effectiveMiniPlayerHeight,
                         expandedBound = maxHeight,
                     )
 
@@ -872,15 +889,18 @@ class MainActivity : FragmentActivity() {
                         shouldShowNavigationBar,
                         playerBottomSheetState.isDismissed,
                         showRail,
+                        isWatch,
                     ) {
                         var bottom = bottomInset
                         if (shouldShowNavigationBar && !showRail) {
                             bottom += NavigationBarHeight
                         }
-                        if (!playerBottomSheetState.isDismissed) bottom += MiniPlayerHeight
+                        if (!playerBottomSheetState.isDismissed) bottom += effectiveMiniPlayerHeight
+                        val top = if (isWatch) 26.dp else AppBarHeight
+                        val extraBottom = if (isWatch) 16.dp else 0.dp
                         windowsInsets
                             .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)
-                            .add(WindowInsets(top = AppBarHeight, bottom = bottom))
+                            .add(WindowInsets(top = top, bottom = bottom + extraBottom))
                     }
                 appBarScrollBehavior(
                     canScroll = {
@@ -975,12 +995,12 @@ class MainActivity : FragmentActivity() {
 
                 var shouldShowTopBar by rememberSaveable { mutableStateOf(false) }
 
-                LaunchedEffect(navBackStackEntry, listenTogetherInTopBar) {
+                LaunchedEffect(navBackStackEntry, listenTogetherInTopBar, isWatch) {
                     val currentRoute = navBackStackEntry?.destination?.route
                     val isListenTogetherScreen =
                         currentRoute == Screens.ListenTogether.route ||
                             currentRoute == "listen_together_from_topbar"
-                    shouldShowTopBar = currentRoute in topLevelScreens &&
+                    shouldShowTopBar = !isWatch && currentRoute in topLevelScreens &&
                         currentRoute != "settings" &&
                         !(isListenTogetherScreen && listenTogetherInTopBar)
                 }
@@ -1041,6 +1061,7 @@ class MainActivity : FragmentActivity() {
                 val artistNameAliases by ArtistNameAliases.aliases.collectAsStateWithLifecycle()
 
                 CompositionLocalProvider(
+                    LocalIsWatch provides isWatch,
                     LocalDatabase provides database,
                     LocalNavController provides navController,
                     LocalContentColor provides if (pureBlack) Color.White else contentColorFor(MaterialTheme.colorScheme.surface),
@@ -1337,7 +1358,37 @@ class MainActivity : FragmentActivity() {
                                     onHomeLongHold = { showAccountDialog = true },
                                 )
                             }
-                            Box(Modifier.weight(1f)) {
+                            val watchTabs = remember {
+                                listOf(
+                                    Screens.Home.route,
+                                    Screens.TvStreaming.route,
+                                    Screens.Radio.route,
+                                    Screens.Library.route,
+                                )
+                            }
+
+                            Box(
+                                Modifier.weight(1f)
+                            ) {
+                                if (isWatch && currentRoute in watchTabs && currentRoute != Screens.Home.route) {
+                                    WatchTabIndicator(
+                                        currentRoute = currentRoute,
+                                        onTabSelected = { targetRoute ->
+                                            if (currentRoute != targetRoute) {
+                                                navController.navigate(targetRoute) {
+                                                    popUpTo(navController.graph.startDestinationId) {
+                                                        saveState = true
+                                                    }
+                                                    launchSingleTop = true
+                                                    restoreState = true
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .align(Alignment.TopCenter)
+                                            .zIndex(10f)
+                                    )
+                                }
                                 // NavHost with animations (Material 3 Expressive style)
                                 NavHost(
                                     navController = navController,
@@ -1724,3 +1775,4 @@ val LocalListenTogetherManager = staticCompositionLocalOf<com.metrolist.music.li
 val LocalChangelogState = staticCompositionLocalOf<MutableState<Boolean>> { error("No LocalChangelogState provided") }
 val LocalArtistNameAliases = staticCompositionLocalOf<Map<String, String>> { emptyMap() }
 val LocalIsPlayerExpanded = compositionLocalOf { false }
+val LocalIsWatch = compositionLocalOf { false }

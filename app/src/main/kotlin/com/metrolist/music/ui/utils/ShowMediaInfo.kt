@@ -8,6 +8,7 @@ package com.metrolist.music.ui.utils
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.text.format.DateUtils
 import android.text.format.Formatter
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -56,6 +57,7 @@ import com.metrolist.music.ui.component.shimmer.TextPlaceholder
 import com.metrolist.music.utils.ArtistNameAliases
 import com.metrolist.music.utils.rememberEnumPreference
 import androidx.compose.ui.platform.LocalLocale
+import java.io.File
 
 @Composable
 fun getLoudnessLevelLabel(loudnessLevel: LoudnessLevel): String {
@@ -69,17 +71,12 @@ fun getLoudnessLevelLabel(loudnessLevel: LoudnessLevel): String {
 
 @Composable
 fun ShowMediaInfo(videoId: String) {
-    if (videoId.isBlank() || videoId.isEmpty()) return
+    if (videoId.isBlank()) return
 
     val windowInsets = WindowInsets.systemBars
-
-    var info by remember {
-        mutableStateOf<MediaInfo?>(null)
-    }
-
+    var info by remember { mutableStateOf<MediaInfo?>(null) }
     val database = LocalDatabase.current
     var song by remember { mutableStateOf<Song?>(null) }
-
     var currentFormat by remember { mutableStateOf<FormatEntity?>(null) }
 
     val playerConnection = LocalPlayerConnection.current
@@ -91,11 +88,41 @@ fun ShowMediaInfo(videoId: String) {
         LoudnessLevelKey,
         defaultValue = LoudnessLevel.BALANCED
     )
-
     val targetLufs: Float = loudnessLevel.targetLufs
 
+    val isLocal = videoId.startsWith("local:") || song?.song?.isLocal == true
+
+    val localFilePath = remember(song, videoId) {
+        if (!isLocal) null
+        else {
+            val path = song?.song?.localPath
+            if (!path.isNullOrBlank() && File(path).exists()) {
+                path
+            } else {
+                val rawId = videoId.removePrefix("local:")
+                try {
+                    val uri = android.content.ContentUris.withAppendedId(
+                        android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                        rawId.toLong()
+                    )
+                    val projection = arrayOf(android.provider.MediaStore.Audio.Media.DATA)
+                    context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val idx = cursor.getColumnIndex(android.provider.MediaStore.Audio.Media.DATA)
+                            if (idx != -1) cursor.getString(idx) else null
+                        } else null
+                    }
+                } catch (e: Exception) {
+                    path
+                }
+            }
+        }
+    }
+
     LaunchedEffect(Unit, videoId) {
-        info = YouTube.getMediaInfo(videoId).getOrNull()
+        if (!videoId.startsWith("local:")) {
+            info = YouTube.getMediaInfo(videoId).getOrNull()
+        }
     }
 
     LaunchedEffect(Unit, videoId) {
@@ -113,78 +140,99 @@ fun ShowMediaInfo(videoId: String) {
     LazyColumn(
         state = rememberLazyListState(),
         modifier = Modifier
-            .padding(
-                windowInsets
-                    .asPaddingValues()
-            )
+            .padding(windowInsets.asPaddingValues())
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        if (info != null) {
+        if (info != null || isLocal || song != null) {
             item(contentType = "MediaDetails") {
                 Column {
-                    val baseList = listOf(
-                        stringResource(R.string.song_title) to (info?.title ?: song?.title),
-                        stringResource(R.string.song_artists) to (
-                            song?.artists?.joinToString {
-                                ArtistNameAliases.resolve(artistNameAliases, it.id, it.name)
-                            } ?: info?.author?.let {
-                                ArtistNameAliases.resolve(artistNameAliases, null, it)
-                            }
-                        ),
-                        stringResource(R.string.media_id) to (song?.id ?: info?.videoId)
+                    val baseList = mutableListOf<Pair<String, String?>>()
+                    val baseIconsList = mutableListOf<Int>()
+
+                    baseList += stringResource(R.string.song_title) to (song?.title ?: info?.title)
+                    baseIconsList += R.drawable.music_note
+
+                    baseList += stringResource(R.string.song_artists) to (
+                        song?.artists?.joinToString {
+                            ArtistNameAliases.resolve(artistNameAliases, it.id, it.name)
+                        } ?: info?.author?.let {
+                            ArtistNameAliases.resolve(artistNameAliases, null, it)
+                        }
                     )
+                    baseIconsList += R.drawable.person
 
-                    val baseIconsList = listOf(
-                        R.drawable.music_note,
-                        R.drawable.person,
-                        R.drawable.media3_icon_bookmark_filled,
-                    )
+                    if (!song?.song?.albumName.isNullOrBlank()) {
+                        baseList += stringResource(R.string.album) to song?.song?.albumName
+                        baseIconsList += R.drawable.album
+                    }
 
-                    val iconsList = listOf(
-                        R.drawable.media3_icon_feed,
-                        R.drawable.media3_icon_thumb_up_unfilled,
-                        R.drawable.media3_icon_thumb_down_unfilled,
-                        R.drawable.key,
-                        R.drawable.play,
-                        R.drawable.info,
-                        R.drawable.radio,
-                        R.drawable.gradient,
-                        R.drawable.contrast,
-                        R.drawable.volume_up,
-                        R.drawable.volume_up,
-                        R.drawable.volume_mute,
-                        R.drawable.content_copy
-                    )
+                    baseList += stringResource(R.string.media_id) to (song?.id ?: info?.videoId)
+                    baseIconsList += R.drawable.media3_icon_bookmark_filled
 
-                    val measuredLufs: Double? = currentFormat?.perceptualLoudnessDb ?: currentFormat?.loudnessDb?.let { it + LoudnessLevel.AGGRESSIVE.targetLufs }
+                    if (!localFilePath.isNullOrBlank()) {
+                        baseList += stringResource(R.string.file_path) to localFilePath
+                        baseIconsList += R.drawable.folder
+                    }
 
-                    val extendedList = if (currentFormat != null) {
-                        listOf(
-                            stringResource(R.string.views) to info?.viewCount?.let(::numberFormatter).orEmpty(),
-                            stringResource(R.string.likes) to info?.like?.let(::numberFormatter).orEmpty(),
-                            stringResource(R.string.dislikes) to info?.dislike?.let(::numberFormatter).orEmpty(),
-                            "Itag" to currentFormat?.itag?.toString(),
-                            stringResource(R.string.stream_client) to currentStreamClient,
-                            stringResource(R.string.mime_type) to currentFormat?.mimeType,
-                            stringResource(R.string.codecs) to currentFormat?.codecs,
-                            stringResource(R.string.bitrate) to currentFormat?.bitrate?.let { "${it / 1000} Kbps" },
-                            stringResource(R.string.sample_rate) to currentFormat?.sampleRate?.let { "$it Hz" },
-                            stringResource(R.string.loudness) to measuredLufs?.let {
-                                String.format(LocalLocale.current.platformLocale, "%.2f dB", it - targetLufs)
-                            },
-                            stringResource(R.string.loudness_level) to getLoudnessLevelLabel(loudnessLevel),
-                            stringResource(R.string.volume) to if (playerConnection != null) "${(playerConnection.player.volume * 100).toInt()}%" else null,
-                            stringResource(R.string.file_size) to
-                                    currentFormat?.contentLength?.let {
-                                        Formatter.formatShortFileSize(
-                                            context,
-                                            it
-                                        )
-                                    },
-                        )
-                    } else {
-                        emptyList()
+                    val iconsList = mutableListOf<Int>()
+                    val extendedList = mutableListOf<Pair<String, String?>>()
+
+                    if (isLocal) {
+                        if (song?.song?.duration != null && song!!.song.duration > 0) {
+                            extendedList += stringResource(R.string.duration) to DateUtils.formatElapsedTime(song!!.song.duration.toLong())
+                            iconsList += R.drawable.play
+                        }
+                        val fileSize = localFilePath?.let { File(it) }?.takeIf { it.exists() }?.length()
+                        if (fileSize != null && fileSize > 0) {
+                            extendedList += stringResource(R.string.file_size) to Formatter.formatShortFileSize(context, fileSize)
+                            iconsList += R.drawable.content_copy
+                        }
+                    } else if (currentFormat != null) {
+                        val measuredLufs: Double? = currentFormat?.perceptualLoudnessDb ?: currentFormat?.loudnessDb?.let { it + LoudnessLevel.AGGRESSIVE.targetLufs }
+
+                        extendedList += stringResource(R.string.views) to info?.viewCount?.let(::numberFormatter).orEmpty()
+                        iconsList += R.drawable.media3_icon_feed
+
+                        extendedList += stringResource(R.string.likes) to info?.like?.let(::numberFormatter).orEmpty()
+                        iconsList += R.drawable.media3_icon_thumb_up_unfilled
+
+                        extendedList += stringResource(R.string.dislikes) to info?.dislike?.let(::numberFormatter).orEmpty()
+                        iconsList += R.drawable.media3_icon_thumb_down_unfilled
+
+                        extendedList += "Itag" to currentFormat?.itag?.toString()
+                        iconsList += R.drawable.key
+
+                        extendedList += stringResource(R.string.stream_client) to currentStreamClient
+                        iconsList += R.drawable.play
+
+                        extendedList += stringResource(R.string.mime_type) to currentFormat?.mimeType
+                        iconsList += R.drawable.info
+
+                        extendedList += stringResource(R.string.codecs) to currentFormat?.codecs
+                        iconsList += R.drawable.radio
+
+                        extendedList += stringResource(R.string.bitrate) to currentFormat?.bitrate?.let { "${it / 1000} Kbps" }
+                        iconsList += R.drawable.gradient
+
+                        extendedList += stringResource(R.string.sample_rate) to currentFormat?.sampleRate?.let { "$it Hz" }
+                        iconsList += R.drawable.contrast
+
+                        extendedList += stringResource(R.string.loudness) to measuredLufs?.let {
+                            String.format(LocalLocale.current.platformLocale, "%.2f dB", it - targetLufs)
+                        }
+                        iconsList += R.drawable.volume_up
+
+                        extendedList += stringResource(R.string.loudness_level) to getLoudnessLevelLabel(loudnessLevel)
+                        iconsList += R.drawable.volume_up
+
+                        extendedList += stringResource(R.string.volume) to if (playerConnection != null) "${(playerConnection.player.volume * 100).toInt()}%" else null
+                        iconsList += R.drawable.volume_mute
+
+                        extendedList += stringResource(R.string.file_size) to currentFormat?.contentLength?.let {
+                            Formatter.formatShortFileSize(context, it)
+                        }
+                        iconsList += R.drawable.content_copy
                     }
 
                     val cardsBaseList = mutableListOf<Material3SettingsItem>()
@@ -218,34 +266,35 @@ fun ShowMediaInfo(videoId: String) {
                     }
 
                     Material3SettingsGroup(
-                        title = stringResource(R.string.general),
+                        title = stringResource(if (isLocal) R.string.local_file_details else R.string.general),
                         items = cardsBaseList
                     )
 
-                    Spacer(Modifier.height(8.dp))
+                    if (cardsExtendedList.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Material3SettingsGroup(
+                            title = stringResource(R.string.information),
+                            items = cardsExtendedList
+                        )
+                    }
 
-                    Material3SettingsGroup(
-                        title = stringResource(R.string.information),
-                        items = cardsExtendedList
-                    )
-
-                    Spacer(Modifier.height(8.dp))
-
-                    val descriptionText = info?.description ?: stringResource(R.string.unknown)
-
-                    Material3SettingsGroup(
-                        title = stringResource(R.string.description),
-                        items = listOf(
-                            Material3SettingsItem(
-                                title = { Text(stringResource(R.string.description)) },
-                                description = { Text(descriptionText) },
-                                onClick = {
-                                    cm.setPrimaryClip(ClipData.newPlainText("text", descriptionText))
-                                    Toast.makeText(context, R.string.copied, Toast.LENGTH_SHORT).show()
-                                }
+                    val descriptionText = info?.description
+                    if (!descriptionText.isNullOrBlank()) {
+                        Spacer(Modifier.height(8.dp))
+                        Material3SettingsGroup(
+                            title = stringResource(R.string.description),
+                            items = listOf(
+                                Material3SettingsItem(
+                                    title = { Text(stringResource(R.string.description)) },
+                                    description = { Text(descriptionText) },
+                                    onClick = {
+                                        cm.setPrimaryClip(ClipData.newPlainText("text", descriptionText))
+                                        Toast.makeText(context, R.string.copied, Toast.LENGTH_SHORT).show()
+                                    }
+                                )
                             )
                         )
-                    )
+                    }
                 }
             }
         } else {

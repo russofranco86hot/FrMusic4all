@@ -51,15 +51,25 @@ internal fun List<Track>.bestMatchingFor(
 ): Track? {
     if (isEmpty()) return null
 
+    if (trackName != null && artistName != null) {
+        val durationFiltered = if (duration > 0) {
+            filter { abs(it.duration.toInt() - duration) <= 12 }
+        } else this
+
+        val match = (if (durationFiltered.isNotEmpty()) durationFiltered else this)
+            .findBestMatch(trackName, artistName)
+        if (match != null) return match
+    }
+
     if (duration == -1) {
-        if (trackName != null && artistName != null) {
-            return findBestMatch(trackName, artistName)
-        }
         return firstOrNull { it.syncedLyrics != null } ?: firstOrNull()
     }
 
-    // Use relaxed matching for duration-based search
-    return bestMatchingForRelaxed(duration)
+    if (trackName == null && artistName == null) {
+        return bestMatchingForRelaxed(duration)
+    }
+
+    return null
 }
 
 private fun List<Track>.findBestMatch(trackName: String, artistName: String): Track? {
@@ -79,9 +89,9 @@ private fun List<Track>.findBestMatch(trackName: String, artistName: String): Tr
             track.artistName.trim().lowercase()
         )
         
-        score = (trackNameSimilarity + artistNameSimilarity) / 2.0
+        score = (trackNameSimilarity * 0.7) + (artistNameSimilarity * 0.3)
 
-        if (track.syncedLyrics != null) score += 0.1
+        if (track.syncedLyrics != null) score += 0.05
         
         score
     }?.takeIf { track ->
@@ -94,7 +104,8 @@ private fun List<Track>.findBestMatch(trackName: String, artistName: String): Tr
             track.artistName.trim().lowercase()
         )
 
-        (trackNameSimilarity + artistNameSimilarity) / 2.0 > 0.6
+        // Must have at least 0.55 title similarity and 0.50 overall
+        trackNameSimilarity >= 0.55 && (trackNameSimilarity * 0.7 + artistNameSimilarity * 0.3) >= 0.50
     }
 }
 
@@ -102,16 +113,26 @@ private fun calculateSimilarity(str1: String, str2: String): Double {
     if (str1 == str2) return 1.0
     if (str1.isEmpty() || str2.isEmpty()) return 0.0
 
-    val containsScore = when {
-        str1.contains(str2) || str2.contains(str1) -> 0.8
-        else -> 0.0
+    val minLen = minOf(str1.length, str2.length)
+    val maxLen = maxOf(str1.length, str2.length)
+
+    // Token word overlap
+    val w1 = str1.split(Regex("[^\\p{L}\\p{Nd}]+")).filter { it.length >= 3 }.toSet()
+    val w2 = str2.split(Regex("[^\\p{L}\\p{Nd}]+")).filter { it.length >= 3 }.toSet()
+    val wordOverlap = if (w1.isNotEmpty() && w2.isNotEmpty()) {
+        w1.intersect(w2).size.toDouble() / maxOf(w1.size, w2.size)
+    } else 0.0
+
+    val containsScore = if ((str1.contains(str2) || str2.contains(str1)) && (minLen.toDouble() / maxLen >= 0.65)) {
+        0.8
+    } else {
+        0.0
     }
 
-    val maxLength = maxOf(str1.length, str2.length)
     val distance = levenshteinDistance(str1, str2)
-    val distanceScore = 1.0 - (distance.toDouble() / maxLength)
+    val distanceScore = 1.0 - (distance.toDouble() / maxLen)
     
-    return maxOf(containsScore, distanceScore)
+    return maxOf(containsScore, distanceScore, wordOverlap)
 }
 
 private fun levenshteinDistance(str1: String, str2: String): Int {

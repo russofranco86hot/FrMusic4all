@@ -25,6 +25,14 @@ enum class RadioTab {
     TOP,
     COUNTRIES,
     GENRES,
+    RECORDINGS,
+}
+
+enum class RadioSortOrder {
+    MOST_LISTENED,
+    MOST_VOTED,
+    NAME,
+    BITRATE,
 }
 
 @HiltViewModel
@@ -34,6 +42,9 @@ class RadioViewModel @Inject constructor(
 
     val favoritesManager = RadioFavoritesManager(context)
     val favorites: StateFlow<List<RadioStation>> = favoritesManager.favorites
+
+    val recordingManager = RadioRecordingManager.getInstance(context)
+    val recordings: StateFlow<List<RadioRecording>> = recordingManager.recordings
 
     private val _currentTab = MutableStateFlow(RadioTab.TOP)
     val currentTab: StateFlow<RadioTab> = _currentTab.asStateFlow()
@@ -55,6 +66,23 @@ class RadioViewModel @Inject constructor(
 
     private val _selectedTag = MutableStateFlow<RadioTag?>(null)
     val selectedTag: StateFlow<RadioTag?> = _selectedTag.asStateFlow()
+
+    private val _sortOrder = MutableStateFlow(RadioSortOrder.MOST_LISTENED)
+    val sortOrder: StateFlow<RadioSortOrder> = _sortOrder.asStateFlow()
+
+    fun setSortOrder(order: RadioSortOrder) {
+        _sortOrder.value = order
+        _stations.value = sortStationsList(_stations.value, order)
+    }
+
+    private fun sortStationsList(list: List<RadioStation>, order: RadioSortOrder): List<RadioStation> {
+        return when (order) {
+            RadioSortOrder.MOST_LISTENED -> list.sortedByDescending { it.clickcount }
+            RadioSortOrder.MOST_VOTED -> list.sortedByDescending { it.votes }
+            RadioSortOrder.NAME -> list.sortedBy { it.name.lowercase() }
+            RadioSortOrder.BITRATE -> list.sortedByDescending { it.bitrate }
+        }
+    }
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -102,7 +130,7 @@ class RadioViewModel @Inject constructor(
                     tag = _selectedTag.value?.name ?: "",
                     limit = 80
                 )
-                _stations.value = results
+                _stations.value = sortStationsList(results, _sortOrder.value)
             } catch (e: Exception) {
                 Timber.e(e, "Error searching radio stations")
             } finally {
@@ -119,7 +147,7 @@ class RadioViewModel @Inject constructor(
                 val topClicks = RadioBrowserClient.getTopClicked(50)
                 // Combine and distinct by UUID
                 val combined = (topVotes + topClicks).distinctBy { it.stationuuid }
-                _stations.value = combined
+                _stations.value = sortStationsList(combined, _sortOrder.value)
             } catch (e: Exception) {
                 Timber.e(e, "Error loading top stations")
             } finally {
@@ -168,7 +196,7 @@ class RadioViewModel @Inject constructor(
                     tag = _selectedTag.value?.name ?: "",
                     limit = 80
                 )
-                _stations.value = results
+                _stations.value = sortStationsList(results, _sortOrder.value)
             } catch (e: Exception) {
                 Timber.e(e, "Error applying filter")
             } finally {

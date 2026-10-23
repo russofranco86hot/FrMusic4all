@@ -104,6 +104,7 @@ import com.metrolist.innertubex.extraction.ContentHints
 import com.metrolist.lastfm.LastFM
 import com.metrolist.music.MainActivity
 import com.metrolist.music.R
+import com.metrolist.music.tv.TvChannelsRepository
 import com.metrolist.music.constants.AddToPlaylistPosition
 import com.metrolist.music.constants.AddToPlaylistPositionKey
 import com.metrolist.music.constants.AndroidAutoTargetPlaylistKey
@@ -1596,6 +1597,12 @@ class MusicService :
             }
 
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                if (com.metrolist.music.lyrics.LiveSpeechTranscriber.isListening.value) {
+                    // Speech transcription is active - do not pause playback
+                    hasAudioFocus = true
+                    lastAudioFocusState = focusChange
+                    return
+                }
                 hasAudioFocus = false
                 audioFocusVolumeMultiplier.value = 1f
                 wasPlayingBeforeAudioFocusLoss = player.isPlaying
@@ -1945,6 +1952,33 @@ class MusicService :
         }
     }
 
+    private fun normalizePlaybackItem(item: MediaItem): MediaItem {
+        val mediaId = item.mediaId
+        val uri = item.requestMetadata.mediaUri ?: item.localConfiguration?.uri
+        var uriStr = uri?.toString() ?: if (mediaId.startsWith("radio:") || mediaId.startsWith("tv:")) mediaId.substringAfter(":") else null
+
+        if (uriStr != null) {
+            if (uriStr.contains("cdn.instream.audio:9714") ||
+                uriStr.contains("solumedia.com.ar/urbanaplay") ||
+                uriStr.contains("cdn.instream.audio:9660") ||
+                uriStr.contains("vmf.edge-apps.net/playlist/urbana")
+            ) {
+                uriStr = "https://live-ar1.cdnrad.com/hls/radio-285/live.m3u8"
+            }
+            val isHls = mediaId.startsWith("tv:") || uriStr.contains(".m3u8", ignoreCase = true) || uriStr.contains("hls", ignoreCase = true)
+            if (isHls && item.localConfiguration?.mimeType != androidx.media3.common.MimeTypes.APPLICATION_M3U8) {
+                return item.buildUpon()
+                    .setUri(uriStr.toUri())
+                    .setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
+                    .build()
+            }
+        }
+        return item
+    }
+
+    private fun normalizePlaybackItems(items: List<MediaItem>): List<MediaItem> =
+        items.map { normalizePlaybackItem(it) }
+
     fun playQueue(
         queue: Queue,
         playWhenReady: Boolean = true,
@@ -2005,7 +2039,8 @@ class MusicService :
                     ),
                 )
             } else {
-                val currentItem = initialStatus.items.getOrNull(initialStatus.mediaItemIndex)
+                val normalizedItems = normalizePlaybackItems(initialStatus.items)
+                val currentItem = normalizedItems.getOrNull(initialStatus.mediaItemIndex)
                 val isRadio = currentItem?.mediaId?.startsWith("radio:") == true
                 currentPlayingMediaId = currentItem?.mediaId
                 val startPosition = if (isRadio) {
@@ -2014,7 +2049,7 @@ class MusicService :
                     initialStatus.position
                 }
                 player.setMediaItems(
-                    initialStatus.items,
+                    normalizedItems,
                     if (initialStatus.mediaItemIndex > 0) initialStatus.mediaItemIndex else 0,
                     startPosition,
                 )
@@ -2248,8 +2283,9 @@ class MusicService :
     fun playNext(items: List<MediaItem>) {
         // If queue is empty or player is idle, play immediately instead
         if (player.mediaItemCount == 0 || player.playbackState == STATE_IDLE) {
-            currentPlayingMediaId = items.firstOrNull()?.mediaId
-            player.setMediaItems(items)
+            val normalized = normalizePlaybackItems(items)
+            currentPlayingMediaId = normalized.firstOrNull()?.mediaId
+            player.setMediaItems(normalized)
             player.prepare()
             if (castConnectionHandler?.isCasting?.value != true && dlnaCastHandler?.isCasting?.value != true) {
                 player.play()
@@ -3149,7 +3185,8 @@ class MusicService :
                     } else {
                         fullStatus.mediaItemIndex
                     }.coerceIn(0, fullStatus.items.size - 1)
-                    player.setMediaItems(fullStatus.items, startIndex, currentPositionMs.coerceAtLeast(0L))
+                    val normalizedFull = normalizePlaybackItems(fullStatus.items)
+                    player.setMediaItems(normalizedFull, startIndex, currentPositionMs.coerceAtLeast(0L))
                     player.prepare()
                     if (player.playbackState != Player.STATE_IDLE) {
                         player.playWhenReady = true
@@ -4620,6 +4657,13 @@ class MusicService :
             // 1. Direct HTTP/HTTPS audio or HLS segment/playlist
             // CRITICAL: NEVER overwrite or redirect sub-resources (like .ts chunks or media playlists)
             if (uriString.startsWith("http://") || uriString.startsWith("https://")) {
+                if (uriString.contains("cdn.instream.audio:9714") || uriString.contains("solumedia.com.ar/urbanaplay") || uriString.contains("cdn.instream.audio:9660") || uriString.contains("vmf.edge-apps.net/playlist/urbana")) {
+                    return@Factory dataSpec.buildUpon()
+                        .setUri("https://live-ar1.cdnrad.com/hls/radio-285/live.m3u8".toUri())
+                        .setKey(null)
+                        .setFlags(dataSpec.flags or DataSpec.FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN)
+                        .build()
+                }
                 return@Factory if (dataSpec.key?.startsWith("radio:") == true) {
                     dataSpec.buildUpon().setKey(null).build()
                 } else {
@@ -4630,11 +4674,49 @@ class MusicService :
             // 2. Radio or TV stream URI scheme (radio:https://... or tv:https://...)
             if (uriString.startsWith("radio:") || dataSpec.key?.startsWith("radio:") == true ||
                 uriString.startsWith("tv:") || dataSpec.key?.startsWith("tv:") == true) {
-                val streamUrl = when {
+                var streamUrl = when {
                     uriString.startsWith("radio:") -> uriString.removePrefix("radio:")
                     uriString.startsWith("tv:") -> uriString.removePrefix("tv:")
                     dataSpec.key?.startsWith("radio:") == true -> dataSpec.key!!.removePrefix("radio:")
                     else -> dataSpec.key!!.removePrefix("tv:")
+                }
+                if (streamUrl.contains("cdn.instream.audio:9714") || streamUrl.contains("solumedia.com.ar/urbanaplay") || streamUrl.contains("cdn.instream.audio:9660") || streamUrl.contains("vmf.edge-apps.net/playlist/urbana")) {
+                    streamUrl = "https://live-ar1.cdnrad.com/hls/radio-285/live.m3u8"
+                }
+                if (uriString.startsWith("tv:") || dataSpec.key?.startsWith("tv:") == true) {
+                    val videoId = when {
+                        streamUrl.contains("watch?v=") -> streamUrl.substringAfter("watch?v=").substringBefore("&").substringBefore("?")
+                        streamUrl.contains("youtu.be/") -> streamUrl.substringAfter("youtu.be/").substringBefore("?").substringBefore("&")
+                        !streamUrl.startsWith("http://") && !streamUrl.startsWith("https://") && streamUrl.length == 11 -> streamUrl
+                        else -> null
+                    }
+                    if (videoId != null) {
+                        val hlsManifest = runBlocking(Dispatchers.IO) {
+                            TvChannelsRepository.resolveHlsManifestUrl(videoId)
+                        }
+                        if (hlsManifest != null) {
+                            streamUrl = hlsManifest
+                        } else {
+                            val extracted = runBlocking(Dispatchers.IO) {
+                                InnerTubeXPlayer.playerResponseForPlayback(
+                                    videoId = videoId,
+                                    audioQuality = audioQuality,
+                                    connectivityManager = connectivityManager,
+                                ).getOrNull()?.streamUrl
+                            }
+                            if (extracted != null) {
+                                streamUrl = extracted
+                            }
+                        }
+                    }
+                    // Prevent ExoPlayer from attempting to parse raw YouTube HTML pages as media files
+                    if (streamUrl.contains("youtube.com/watch?v=") || streamUrl.contains("youtu.be/")) {
+                        throw PlaybackException(
+                            "La señal en vivo no está disponible en este momento.",
+                            null,
+                            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                        )
+                    }
                 }
                 return@Factory dataSpec.buildUpon()
                     .setUri(streamUrl.toUri())
@@ -4920,6 +5002,16 @@ class MusicService :
                         ),
                     )
                 }.getOrElse { throwable ->
+                    val liveHlsUrl = runBlocking(Dispatchers.IO) {
+                        TvChannelsRepository.resolveHlsManifestUrl(mediaId)
+                    }
+                    if (liveHlsUrl != null) {
+                        return@Factory dataSpec.buildUpon()
+                            .setUri(liveHlsUrl.toUri())
+                            .setKey(null)
+                            .setFlags(dataSpec.flags or DataSpec.FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN)
+                            .build()
+                    }
                     when (throwable) {
                         is PlaybackException -> {
                             throw throwable
@@ -6298,6 +6390,9 @@ class MusicService :
         const val PLAYLIST = "playlist"
         const val YOUTUBE_PLAYLIST = "youtube_playlist"
         const val SPOTIFY_PLAYLIST = "spotify_playlist"
+        const val RADIO = "radio"
+        const val TV = "tv"
+        const val LOCAL = "local"
         const val SEARCH = "search"
         const val SHUFFLE_ACTION = "__shuffle__"
 

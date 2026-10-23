@@ -152,8 +152,8 @@ object LrcLib {
                 }?.let(LrcLib::Lyrics)
             }
             else -> {
-                // Try with relaxed duration matching (±5 seconds instead of ±2)
-                tracks.bestMatchingForRelaxed(duration)?.let { track ->
+                // Match with title, artist and duration
+                tracks.bestMatchingFor(duration, cleanedTitle, cleanedArtist)?.let { track ->
                     track.syncedLyrics ?: track.plainLyrics
                 }?.let(LrcLib::Lyrics)
             }
@@ -179,24 +179,17 @@ object LrcLib {
         var count = 0
         var plain = 0
 
-        val sortedTracks = when {
-            duration == -1 -> {
-                tracks.sortedByDescending { track ->
-                    var score = 0.0
-
-                    if (track.syncedLyrics != null) score += 1.0
-
-                    val titleSimilarity = calculateStringSimilarity(cleanedTitle, track.trackName)
-                    val artistSimilarity = calculateStringSimilarity(cleanedArtist, track.artistName)
-                    score += (titleSimilarity + artistSimilarity) / 2.0
-                    
-                    score
-                }
+        val sortedTracks = tracks
+            .map { track ->
+                val titleSimilarity = calculateStringSimilarity(cleanedTitle, track.trackName)
+                val artistSimilarity = calculateStringSimilarity(cleanedArtist, track.artistName)
+                val durDiff = if (duration > 0) abs(track.duration.toInt() - duration) else 0
+                val score = (titleSimilarity * 0.7) + (artistSimilarity * 0.3) - (durDiff * 0.005)
+                track to Pair(score, titleSimilarity)
             }
-            else -> {
-                tracks.sortedBy { abs(it.duration.toInt() - duration) }
-            }
-        }
+            .filter { it.second.second >= 0.40 } // Must have at least 40% title similarity
+            .sortedByDescending { it.second.first }
+            .map { it.first }
 
         sortedTracks.forEach { track ->
             currentCoroutineContext().ensureActive()

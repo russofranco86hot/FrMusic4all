@@ -83,6 +83,7 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import coil3.compose.AsyncImage
 import com.metrolist.music.LocalDatabase
+import com.metrolist.music.LocalIsWatch
 import com.metrolist.music.LocalListenTogetherManager
 import com.metrolist.music.LocalPlayerConnection
 import com.metrolist.music.R
@@ -301,17 +302,20 @@ private fun NewMiniPlayer(
         }
     }
 
+    val isWatch = LocalIsWatch.current
+    val effectiveMiniPlayerHeight = if (isWatch) 40.dp else MiniPlayerHeight
+
     // Memoize colors
-    val backgroundColor = when (miniPlayerBackground) {
+    val backgroundColor = if (isWatch) Color.Black else when (miniPlayerBackground) {
         MiniPlayerBackgroundStyle.DEFAULT    -> MaterialTheme.colorScheme.surfaceContainer
         MiniPlayerBackgroundStyle.TRANSPARENT -> Color.Black.copy(alpha = 0.25f)
         MiniPlayerBackgroundStyle.BLUR       -> MaterialTheme.colorScheme.surfaceContainer
         MiniPlayerBackgroundStyle.GRADIENT   -> MaterialTheme.colorScheme.surfaceContainer
         MiniPlayerBackgroundStyle.PURE_BLACK -> Color.Black
     }
-    val forceLightColors = !useDarkTheme && (miniPlayerBackground == MiniPlayerBackgroundStyle.PURE_BLACK ||
+    val forceLightColors = isWatch || (!useDarkTheme && (miniPlayerBackground == MiniPlayerBackgroundStyle.PURE_BLACK ||
             miniPlayerBackground == MiniPlayerBackgroundStyle.BLUR ||
-            miniPlayerBackground == MiniPlayerBackgroundStyle.GRADIENT)
+            miniPlayerBackground == MiniPlayerBackgroundStyle.GRADIENT))
 
     val primaryColor = if (forceLightColors) Color.White else MaterialTheme.colorScheme.primary
     val outlineColor = if (forceLightColors) Color.White else MaterialTheme.colorScheme.outline
@@ -322,9 +326,9 @@ private fun NewMiniPlayer(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(MiniPlayerHeight)
+                .height(effectiveMiniPlayerHeight)
                 .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal))
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = if (isWatch) 6.dp else 12.dp)
                 .let { baseModifier ->
                     if (swipeThumbnail) {
                         baseModifier.pointerInput(Unit) {
@@ -393,11 +397,11 @@ private fun NewMiniPlayer(
             modifier =
                 Modifier
                     .then(if (isTabletLandscape) Modifier.width(500.dp).align(Alignment.Center) else Modifier.fillMaxWidth())
-                    .height(64.dp)
+                    .height(if (isWatch) 40.dp else 64.dp)
                     .offset { IntOffset(offsetXAnimatable.value.roundToInt(), 0) }
-                    .clip(RoundedCornerShape(32.dp))
+                    .clip(RoundedCornerShape(if (isWatch) 20.dp else 32.dp))
                     .background(color = backgroundColor)
-                    .border(1.dp, outlineColor.copy(alpha = 0.3f), RoundedCornerShape(32.dp))
+                    .border(1.dp, outlineColor.copy(alpha = 0.3f), RoundedCornerShape(if (isWatch) 20.dp else 32.dp))
                     .clickable(
                         interactionSource = interactionSource,
                         indication = LocalIndication.current,
@@ -443,7 +447,7 @@ private fun NewMiniPlayer(
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxSize().padding(horizontal = if (isWatch) 6.dp else 8.dp, vertical = if (isWatch) 2.dp else 8.dp),
             ) {
                 // Play button with progress - isolated composable
                 NewMiniPlayerPlayButton(
@@ -461,7 +465,7 @@ private fun NewMiniPlayer(
                     coverIsLight = coverIsLight,
                 )
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(if (isWatch) 8.dp else 16.dp))
 
                 // Song info - isolated composable
                 NewMiniPlayerSongInfo(
@@ -471,39 +475,41 @@ private fun NewMiniPlayer(
                     modifier = Modifier.weight(1f),
                 )
 
-                Spacer(modifier = Modifier.width(12.dp))
-
-                // Cast indicator
-                if (isCasting || isDlnaCasting) {
-                    Icon(
-                        painter = painterResource(R.drawable.cast_connected),
-                        contentDescription = "Casting",
-                        tint = primaryColor,
-                        modifier = Modifier.size(20.dp),
-                    )
+                if (!isWatch) {
                     Spacer(modifier = Modifier.width(12.dp))
-                }
 
-// Subscribe button - isolated composable
-                mediaMetadata?.artists?.firstOrNull()?.id?.let { artistId ->
-                    SubscribeButton(
-                        artistId = artistId,
-                        metadata = mediaMetadata!!,
-                        primaryColor = primaryColor,
+                    // Cast indicator
+                    if (isCasting || isDlnaCasting) {
+                        Icon(
+                            painter = painterResource(R.drawable.cast_connected),
+                            contentDescription = "Casting",
+                            tint = primaryColor,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+
+                    // Subscribe button - isolated composable
+                    mediaMetadata?.artists?.firstOrNull()?.id?.let { artistId ->
+                        SubscribeButton(
+                            artistId = artistId,
+                            metadata = mediaMetadata!!,
+                            primaryColor = primaryColor,
+                            outlineColor = outlineColor,
+                            onSurfaceColor = onSurfaceColor,
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Favorite button - isolated composable
+                    mediaMetadata?.let { FavoriteButton(
+                        songId = it.id,
+                        errorColor = errorColor,
                         outlineColor = outlineColor,
                         onSurfaceColor = onSurfaceColor,
                     )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-// Favorite button - isolated composable
-                mediaMetadata?.let { FavoriteButton(
-                    songId = it.id,
-                    errorColor = errorColor,
-                    outlineColor = outlineColor,
-                    onSurfaceColor = onSurfaceColor,
-                )
+                    }
                 }
             }
         }
@@ -539,15 +545,16 @@ private fun NewMiniPlayerPlayButton(
     }
     val isListenTogetherGuest = listenTogetherManager?.let { it.isInRoom && !it.isHost } ?: false
     val isMuted by playerConnection.isMuted.collectAsStateWithLifecycle()
+    val isWatch = LocalIsWatch.current
 
     val trackColor = outlineColor.copy(alpha = 0.2f)
-    val strokeWidth = 3.dp
+    val strokeWidth = if (isWatch) 2.dp else 3.dp
 
     Box(
         contentAlignment = Alignment.Center,
         modifier =
             Modifier
-                .size(48.dp)
+                .size(if (isWatch) 36.dp else 48.dp)
                 .drawWithContent {
                     drawContent()
                     // Draw progress arc - this reads progressState.progress during draw phase only
@@ -585,7 +592,7 @@ private fun NewMiniPlayerPlayButton(
             contentAlignment = Alignment.Center,
             modifier =
                 Modifier
-                    .size(40.dp)
+                    .size(if (isWatch) 30.dp else 40.dp)
                     .clip(CircleShape)
                     .border(1.dp, outlineColor.copy(alpha = 0.3f), CircleShape)
                     .clickable {
@@ -776,6 +783,9 @@ private fun LegacyMiniPlayer(
             (600 / (1f + kotlin.math.exp(-(-11.44748 * swipeSensitivity + 9.04945)))).roundToInt()
         }
 
+    val isWatch = LocalIsWatch.current
+    val effectiveMiniPlayerHeight = if (isWatch) 44.dp else MiniPlayerHeight
+
     val primaryColor = MaterialTheme.colorScheme.primary
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
 
@@ -785,11 +795,11 @@ private fun LegacyMiniPlayer(
         modifier =
             modifier
                 .then(if (isTabletLandscape) Modifier.width(500.dp) else Modifier.fillMaxWidth())
-                .height(MiniPlayerHeight)
+                .height(effectiveMiniPlayerHeight)
                 .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal))
                 .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                 .background(
-                    if (pureBlack && isSystemInDarkTheme()) {
+                    if ((pureBlack || isWatch) && isSystemInDarkTheme()) {
                         Color.Black
                     } else {
                         MaterialTheme.colorScheme.surfaceContainer
@@ -994,6 +1004,7 @@ private fun LegacyMiniMediaInfo(
 ) {
     val error by LocalPlayerConnection.current?.error?.collectAsState() ?: remember { mutableStateOf(null) }
     val cropAlbumArt by rememberPreference(CropAlbumArtKey, false)
+    val isWatch = LocalIsWatch.current
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -1002,8 +1013,8 @@ private fun LegacyMiniMediaInfo(
         Box(
             modifier =
                 Modifier
-                    .padding(6.dp)
-                    .size(48.dp)
+                    .padding(if (isWatch) 2.dp else 6.dp)
+                    .size(if (isWatch) 34.dp else 48.dp)
                     .clip(RoundedCornerShape(ThumbnailCornerRadius)),
         ) {
             Box(
@@ -1087,16 +1098,16 @@ private fun SubscribeButton(
     outlineColor: Color,
     onSurfaceColor: Color,
 ) {
+    val isWatch = LocalIsWatch.current
     val database = LocalDatabase.current
     val libraryArtist by database.artist(artistId).collectAsStateWithLifecycle(initialValue = null)
     val isSubscribed = libraryArtist?.artist?.bookmarkedAt != null
-
 
     Box(
         contentAlignment = Alignment.Center,
         modifier =
             Modifier
-                .size(40.dp)
+                .size(if (isWatch) 28.dp else 40.dp)
                 .clip(CircleShape)
                 .border(
                     width = 1.dp,
@@ -1129,7 +1140,7 @@ private fun SubscribeButton(
             painter = painterResource(if (isSubscribed) R.drawable.subscribed else R.drawable.subscribe),
             contentDescription = null,
             tint = if (isSubscribed) primaryColor else onSurfaceColor.copy(alpha = 0.7f),
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(if (isWatch) 16.dp else 20.dp),
         )
     }
 }
@@ -1141,6 +1152,7 @@ private fun FavoriteButton(
     outlineColor: Color,
     onSurfaceColor: Color,
 ) {
+    val isWatch = LocalIsWatch.current
     val database = LocalDatabase.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val librarySong by database.song(songId).collectAsStateWithLifecycle(initialValue = null)
@@ -1152,7 +1164,7 @@ private fun FavoriteButton(
         contentAlignment = Alignment.Center,
         modifier =
             Modifier
-                .size(40.dp)
+                .size(if (isWatch) 28.dp else 40.dp)
                 .clip(CircleShape)
                 .border(
                     width = 1.dp,
@@ -1167,7 +1179,7 @@ private fun FavoriteButton(
             painter = painterResource(if (isLiked) R.drawable.favorite else R.drawable.favorite_border),
             contentDescription = null,
             tint = if (isLiked) errorColor else onSurfaceColor.copy(alpha = 0.7f),
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(if (isWatch) 16.dp else 20.dp),
         )
     }
 }

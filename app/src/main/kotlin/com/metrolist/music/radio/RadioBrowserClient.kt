@@ -119,6 +119,17 @@ object RadioBrowserClient {
         }
     }
 
+    suspend fun getStationByUuid(uuid: String): RadioStation? = withContext(Dispatchers.IO) {
+        val body = fetchString("/json/stations/byuuid/$uuid") ?: return@withContext null
+        try {
+            val list = json.decodeFromString<List<RadioStation>>(body)
+            list.firstOrNull()
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to decode station by uuid $uuid")
+            null
+        }
+    }
+
     suspend fun resolveClick(stationUuid: String): String? = withContext(Dispatchers.IO) {
         val body = fetchString("/json/url/$stationUuid") ?: return@withContext null
         try {

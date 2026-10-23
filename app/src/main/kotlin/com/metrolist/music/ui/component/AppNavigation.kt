@@ -8,6 +8,9 @@ package com.metrolist.music.ui.component
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
+import com.metrolist.music.LocalIsWatch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -139,8 +142,9 @@ fun AppNavigationBar(
     onSearchLongClick: (() -> Unit)? = null,
     onHomeLongHold: (() -> Unit)? = null,
 ) {
-    val containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
-    val contentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+    val isWatch = LocalIsWatch.current
+    val containerColor = if (pureBlack || isWatch) Color.Black else MaterialTheme.colorScheme.surfaceContainer
+    val contentColor = if (pureBlack || isWatch) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
     val haptics = LocalHapticFeedback.current
     val viewConfiguration = LocalViewConfiguration.current
 
@@ -200,10 +204,11 @@ fun AppNavigationBar(
                 icon = {
                     Icon(
                         painter = painterResource(id = iconRes),
-                        contentDescription = stringResource(screen.titleId)
+                        contentDescription = stringResource(screen.titleId),
+                        modifier = if (isWatch) Modifier.size(20.dp) else Modifier
                     )
                 },
-                label = if (!slimNav) {
+                label = if (!slimNav && !isWatch) {
                     {
                         Text(
                             text = stringResource(screen.titleId),

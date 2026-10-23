@@ -55,8 +55,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -111,6 +115,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.focus.FocusRequester
+import com.metrolist.music.LocalIsWatch
+import com.metrolist.music.radio.RadioRecordingManager
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
@@ -167,6 +173,7 @@ import com.metrolist.music.ui.component.BottomSheet
 import com.metrolist.music.ui.component.BottomSheetState
 import com.metrolist.music.ui.component.LocalBottomSheetPageState
 import com.metrolist.music.ui.component.LocalMenuState
+import com.metrolist.music.ui.component.LiveSpeechTranscriberView
 import com.metrolist.music.ui.component.Lyrics
 import com.metrolist.music.ui.component.PlayerSliderTrack
 import com.metrolist.music.ui.component.ResizableIconButton
@@ -307,11 +314,12 @@ fun BottomSheetPlayer(
             PlayerBackgroundStyle.DEFAULT -> MaterialTheme.colorScheme.secondary
             else -> MaterialTheme.colorScheme.onSurface
         }
+    val isWatch = LocalIsWatch.current
     val useBlackBackground =
-        remember(isSystemInDarkTheme, darkTheme, pureBlack) {
+        remember(isSystemInDarkTheme, darkTheme, pureBlack, isWatch) {
             val useDarkTheme =
                 if (darkTheme == DarkMode.AUTO) isSystemInDarkTheme else darkTheme == DarkMode.ON
-            useDarkTheme && pureBlack
+            isWatch || (useDarkTheme && pureBlack)
         }
 
     val playbackState by playerConnection.playbackState.collectAsState()
@@ -834,28 +842,23 @@ fun BottomSheetPlayer(
         }
     }
 
-    val dismissedBound = QueuePeekHeight + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
+    val dismissedBound = (if (isWatch) 0.dp else QueuePeekHeight) + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
 
     val queueSheetState =
         rememberBottomSheetState(
             dismissedBound = dismissedBound,
             expandedBound = state.expandedBound,
-            collapsedBound = dismissedBound + 1.dp,
+            collapsedBound = if (isWatch) dismissedBound else dismissedBound + 1.dp,
             initialAnchor = 1,
         )
 
     val bottomSheetBackgroundColor =
-        when (playerBackground) {
-            PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT -> {
-                MaterialTheme.colorScheme.surfaceContainer
-            }
-
-            else -> {
-                if (useBlackBackground) {
-                    Color.Black
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainer
-                }
+        if (isWatch || useBlackBackground) {
+            Color.Black
+        } else {
+            when (playerBackground) {
+                PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT -> MaterialTheme.colorScheme.surfaceContainer
+                else -> MaterialTheme.colorScheme.surfaceContainer
             }
         }
 
@@ -871,7 +874,8 @@ fun BottomSheetPlayer(
                         .fillMaxSize()
                         .background(bottomSheetBackgroundColor),
             ) {
-                when (playerBackground) {
+                if (!isWatch) {
+                    when (playerBackground) {
                     PlayerBackgroundStyle.BLUR -> {
                         AnimatedContent(
                             targetState = mediaMetadata?.thumbnailUrl,
@@ -947,6 +951,7 @@ fun BottomSheetPlayer(
                     }
                 }
             }
+            }
         },
         onDismiss =
             if (!isListenTogetherGuest) {
@@ -973,13 +978,14 @@ fun BottomSheetPlayer(
                 label = "playPauseRoundness",
             )
 
+            val playerHorizontalPadding = if (isWatch) 10.dp else PlayerHorizontalPadding
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = PlayerHorizontalPadding),
+                        .padding(horizontal = playerHorizontalPadding),
             ) {
                 AnimatedContent(
                     targetState = showInlineLyrics,
@@ -991,7 +997,7 @@ fun BottomSheetPlayer(
                                 Box(
                                     modifier =
                                         Modifier
-                                            .size(56.dp)
+                                            .size(if (isWatch) 36.dp else 56.dp)
                                             .clip(RoundedCornerShape(ThumbnailCornerRadius))
                                             .background(MaterialTheme.colorScheme.surfaceVariant),
                                     contentAlignment = Alignment.Center,
@@ -1001,7 +1007,7 @@ fun BottomSheetPlayer(
                                         contentDescription = null,
                                         modifier =
                                             Modifier
-                                                .size(32.dp),
+                                                .size(if (isWatch) 20.dp else 32.dp),
                                         tint = textButtonColor.copy(alpha = 0.7f),
                                     )
                                 }
@@ -1012,11 +1018,11 @@ fun BottomSheetPlayer(
                                     contentScale = if (cropAlbumArt) ContentScale.Crop else ContentScale.Fit,
                                     modifier =
                                         Modifier
-                                            .size(56.dp)
+                                            .size(if (isWatch) 36.dp else 56.dp)
                                             .clip(RoundedCornerShape(ThumbnailCornerRadius)),
                                 )
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
+                            Spacer(modifier = Modifier.width(if (isWatch) 6.dp else 12.dp))
                         }
                     } else {
                         Spacer(modifier = Modifier.width(0.dp))
@@ -1032,7 +1038,7 @@ fun BottomSheetPlayer(
                     ) { title ->
                         Text(
                             text = title,
-                            style = MaterialTheme.typography.titleLarge,
+                            style = if (isWatch) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -1092,7 +1098,7 @@ fun BottomSheetPlayer(
                                 var clickOffset by remember { mutableStateOf<Offset?>(null) }
                                 Text(
                                     text = annotatedString,
-                                    style = MaterialTheme.typography.titleMedium.copy(color = TextBackgroundColor),
+                                    style = (if (isWatch) MaterialTheme.typography.bodySmall else MaterialTheme.typography.titleMedium).copy(color = TextBackgroundColor),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     onTextLayout = { layoutResult = it },
@@ -1170,6 +1176,52 @@ fun BottomSheetPlayer(
                         )
 
                     val middleShape = RoundedCornerShape(3.dp)
+
+                    val isRadio = mediaMetadata.id.startsWith("radio:")
+                    val recManager = remember { RadioRecordingManager.getInstance(context) }
+                    val isRecording by recManager.isRecording.collectAsStateWithLifecycle()
+                    val recordingSeconds by recManager.recordingSeconds.collectAsStateWithLifecycle()
+
+                    if (isRadio) {
+                        FilledTonalButton(
+                            onClick = {
+                                if (isRecording) {
+                                    val saved = recManager.stopRecording()
+                                    if (saved != null) {
+                                        Toast.makeText(context, context.getString(R.string.radio_recording_saved, saved.title), Toast.LENGTH_SHORT).show()
+                                    }
+                                } else {
+                                    val streamUrl = mediaMetadata.id.removePrefix("radio:")
+                                    recManager.startRecording(mediaMetadata.title, streamUrl)
+                                }
+                            },
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = if (isRecording) Color.Red.copy(alpha = 0.85f) else textButtonColor,
+                                contentColor = if (isRecording) Color.White else iconButtonColor,
+                            ),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.height(38.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isRecording) Color.White else Color.Red)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = if (isRecording) {
+                                    val mins = recordingSeconds / 60
+                                    val secs = recordingSeconds % 60
+                                    "REC %02d:%02d".format(mins, secs)
+                                } else {
+                                    stringResource(R.string.radio_record)
+                                },
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
 
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -1463,7 +1515,7 @@ fun BottomSheetPlayer(
                         },
                         enabled = !isListenTogetherGuest,
                         colors = PlayerSliderColors.getSliderColors(textButtonColor, playerBackground, useDarkTheme),
-                        modifier = Modifier.padding(horizontal = PlayerHorizontalPadding),
+                        modifier = Modifier.padding(horizontal = playerHorizontalPadding),
                     )
                 }
 
@@ -1490,7 +1542,7 @@ fun BottomSheetPlayer(
                                 }
                                 sliderPosition = null
                             },
-                            modifier = Modifier.padding(horizontal = PlayerHorizontalPadding),
+                            modifier = Modifier.padding(horizontal = playerHorizontalPadding),
                             colors = PlayerSliderColors.getSliderColors(textButtonColor, playerBackground, useDarkTheme),
                             isPlaying = effectiveIsPlaying,
                         )
@@ -1517,7 +1569,7 @@ fun BottomSheetPlayer(
                                 sliderPosition = null
                             },
                             colors = PlayerSliderColors.getSliderColors(textButtonColor, playerBackground, useDarkTheme),
-                            modifier = Modifier.padding(horizontal = PlayerHorizontalPadding),
+                            modifier = Modifier.padding(horizontal = playerHorizontalPadding),
                             isPlaying = effectiveIsPlaying,
                         )
                     }
@@ -1557,7 +1609,7 @@ fun BottomSheetPlayer(
                                 colors = PlayerSliderColors.getSliderColors(textButtonColor, playerBackground, useDarkTheme),
                             )
                         },
-                        modifier = Modifier.padding(horizontal = PlayerHorizontalPadding),
+                        modifier = Modifier.padding(horizontal = playerHorizontalPadding),
                     )
                 }
             }
@@ -1570,11 +1622,11 @@ fun BottomSheetPlayer(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = PlayerHorizontalPadding + 4.dp),
+                        .padding(horizontal = playerHorizontalPadding + 4.dp),
             ) {
                 Text(
                     text = makeTimeString(sliderPosition ?: effectivePosition),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = if (isWatch) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
                     color = TextBackgroundColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1582,14 +1634,14 @@ fun BottomSheetPlayer(
 
                 Text(
                     text = if (duration != C.TIME_UNSET) makeTimeString(duration) else "",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = if (isWatch) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
                     color = TextBackgroundColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(if (isWatch) 4.dp else 24.dp))
 
             AnimatedVisibility(
                 visible = !isFullScreen,
@@ -1677,17 +1729,17 @@ fun BottomSheetPlayer(
                                     ),
                                 modifier =
                                     Modifier
-                                        .height(68.dp)
+                                        .height(if (isWatch) 44.dp else 68.dp)
                                         .weight(backButtonWeight),
                             ) {
                                 Icon(
                                     painter = painterResource(R.drawable.skip_previous),
                                     contentDescription = null,
-                                    modifier = Modifier.size(32.dp),
+                                    modifier = Modifier.size(if (isWatch) 20.dp else 32.dp),
                                 )
                             }
 
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(if (isWatch) 4.dp else 8.dp))
 
                             FilledIconButton(
                                 onClick = {
@@ -1723,7 +1775,7 @@ fun BottomSheetPlayer(
                                     ),
                                 modifier =
                                     Modifier
-                                        .height(68.dp)
+                                        .height(if (isWatch) 44.dp else 68.dp)
                                         .weight(playPauseWeight)
                                         .focusRequester(focusRequester),
                             ) {
@@ -1746,22 +1798,24 @@ fun BottomSheetPlayer(
                                             } else {
                                                 if (effectiveIsPlaying) stringResource(R.string.pause) else stringResource(R.string.play)
                                             },
-                                        modifier = Modifier.size(32.dp),
+                                        modifier = Modifier.size(if (isWatch) 22.dp else 32.dp),
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text =
-                                            if (isListenTogetherGuest) {
-                                                if (isMuted) stringResource(R.string.unmute) else stringResource(R.string.mute)
-                                            } else {
-                                                if (effectiveIsPlaying) stringResource(R.string.pause) else stringResource(R.string.play)
-                                            },
-                                        style = MaterialTheme.typography.titleMedium,
-                                    )
+                                    if (!isWatch) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text =
+                                                if (isListenTogetherGuest) {
+                                                    if (isMuted) stringResource(R.string.unmute) else stringResource(R.string.mute)
+                                                } else {
+                                                    if (effectiveIsPlaying) stringResource(R.string.pause) else stringResource(R.string.play)
+                                                },
+                                            style = MaterialTheme.typography.titleMedium,
+                                        )
+                                    }
                                 }
                             }
 
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(if (isWatch) 4.dp else 8.dp))
 
                             FilledIconButton(
                                 onClick = playerConnection::seekToNext,
@@ -1775,13 +1829,13 @@ fun BottomSheetPlayer(
                                     ),
                                 modifier =
                                     Modifier
-                                        .height(68.dp)
+                                        .height(if (isWatch) 44.dp else 68.dp)
                                         .weight(nextButtonWeight),
                             ) {
                                 Icon(
                                     painter = painterResource(R.drawable.skip_next),
                                     contentDescription = null,
-                                    modifier = Modifier.size(32.dp),
+                                    modifier = Modifier.size(if (isWatch) 20.dp else 32.dp),
                                 )
                             }
                         }
@@ -1791,7 +1845,7 @@ fun BottomSheetPlayer(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = PlayerHorizontalPadding),
+                                    .padding(horizontal = playerHorizontalPadding),
                         ) {
                             Box(modifier = Modifier.weight(1f)) {
                                 ResizableIconButton(
@@ -1804,8 +1858,8 @@ fun BottomSheetPlayer(
                                     color = TextBackgroundColor,
                                     modifier =
                                         Modifier
-                                            .size(32.dp)
-                                            .padding(4.dp)
+                                            .size(if (isWatch) 22.dp else 32.dp)
+                                            .padding(if (isWatch) 2.dp else 4.dp)
                                             .align(Alignment.Center)
                                             .alpha(
                                                 if (isListenTogetherGuest || repeatMode == Player.REPEAT_MODE_OFF) 0.5f else 1f,
@@ -1824,20 +1878,20 @@ fun BottomSheetPlayer(
                                     color = TextBackgroundColor,
                                     modifier =
                                         Modifier
-                                            .size(32.dp)
+                                            .size(if (isWatch) 24.dp else 32.dp)
                                             .align(Alignment.Center)
                                             .alpha(if (isListenTogetherGuest) 0.5f else 1f),
                                     onClick = playerConnection::seekToPrevious,
                                 )
                             }
 
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(if (isWatch) 4.dp else 8.dp))
 
                             Box(
                                 modifier =
                                     Modifier
-                                        .size(72.dp)
-                                        .clip(RoundedCornerShape(playPauseRoundness))
+                                        .size(if (isWatch) 48.dp else 72.dp)
+                                        .clip(RoundedCornerShape(if (isWatch) 18.dp else playPauseRoundness))
                                         .background(textButtonColor)
                                         .clickable {
                                             if (isListenTogetherGuest) {
@@ -1885,11 +1939,11 @@ fun BottomSheetPlayer(
                                     modifier =
                                         Modifier
                                             .align(Alignment.Center)
-                                            .size(36.dp),
+                                            .size(if (isWatch) 24.dp else 36.dp),
                                 )
                             }
 
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(if (isWatch) 4.dp else 8.dp))
 
                             Box(modifier = Modifier.weight(1f)) {
                                 ResizableIconButton(
@@ -1898,7 +1952,7 @@ fun BottomSheetPlayer(
                                     color = TextBackgroundColor,
                                     modifier =
                                         Modifier
-                                            .size(32.dp)
+                                            .size(if (isWatch) 24.dp else 32.dp)
                                             .align(Alignment.Center)
                                             .alpha(if (isListenTogetherGuest) 0.5f else 1f),
                                     onClick = playerConnection::seekToNext,
@@ -1914,8 +1968,8 @@ fun BottomSheetPlayer(
                                     color = if (isFavorite) MaterialTheme.colorScheme.error else TextBackgroundColor,
                                     modifier =
                                         Modifier
-                                            .size(32.dp)
-                                            .padding(4.dp)
+                                            .size(if (isWatch) 22.dp else 32.dp)
+                                            .padding(if (isWatch) 2.dp else 4.dp)
                                             .align(Alignment.Center),
                                     onClick = playerConnection::toggleLike,
                                 )
@@ -2048,7 +2102,7 @@ fun BottomSheetPlayer(
                         controlsContent(it)
                     }
 
-                    Spacer(Modifier.height(30.dp))
+                    Spacer(Modifier.height(if (isWatch) 4.dp else 30.dp))
                 }
             }
         }
@@ -2195,11 +2249,10 @@ fun InlineLyricsView(
             }
 
             lyrics == LyricsEntity.LYRICS_NOT_FOUND -> {
-                Text(
-                    text = stringResource(R.string.lyrics_not_found),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                    textAlign = TextAlign.Center,
+                LiveSpeechTranscriberView(
+                    modifier = Modifier.fillMaxSize(),
+                    isRadioOrLive = mediaMetadata?.id?.startsWith("radio:") == true || mediaMetadata?.id?.startsWith("tv:") == true,
+                    autoStart = true,
                 )
             }
 

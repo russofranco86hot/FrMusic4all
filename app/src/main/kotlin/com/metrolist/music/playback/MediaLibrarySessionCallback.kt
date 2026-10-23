@@ -76,6 +76,11 @@ import com.metrolist.music.constants.AndroidAutoYouTubePlaylistsKey
 import com.metrolist.music.constants.AutoRadioQueueKey
 import com.metrolist.music.playback.queues.ListQueue
 import com.metrolist.music.playback.queues.YouTubeQueue
+import com.metrolist.music.radio.RadioBrowserClient
+import com.metrolist.music.radio.RadioFavoritesManager
+import com.metrolist.music.radio.RadioRecordingManager
+import com.metrolist.music.tv.TvChannelsRepository
+import java.io.File
 import com.metrolist.music.ui.screens.settings.AndroidAutoSection
 import com.metrolist.music.ui.screens.settings.deserializeSections
 import com.metrolist.music.ui.screens.settings.serializeSections
@@ -228,6 +233,27 @@ constructor(
                             .ifEmpty { listOf(AndroidAutoSection.LIKED to true) }
                             .map { (section, _) ->
                                 when (section) {
+                                    AndroidAutoSection.RADIO -> browsableMediaItem(
+                                        MusicService.RADIO,
+                                        context.getString(R.string.radio),
+                                        null,
+                                        drawableUri(R.drawable.radio),
+                                        MediaMetadata.MEDIA_TYPE_FOLDER_RADIO_STATIONS,
+                                    )
+                                    AndroidAutoSection.STREAMING -> browsableMediaItem(
+                                        MusicService.TV,
+                                        context.getString(R.string.tv_streaming),
+                                        null,
+                                        drawableUri(R.drawable.ic_tv),
+                                        MediaMetadata.MEDIA_TYPE_FOLDER_MIXED,
+                                    )
+                                    AndroidAutoSection.LOCAL -> browsableMediaItem(
+                                        MusicService.LOCAL,
+                                        context.getString(R.string.local_files),
+                                        null,
+                                        drawableUri(R.drawable.download),
+                                        MediaMetadata.MEDIA_TYPE_FOLDER_MIXED,
+                                    )
                                     AndroidAutoSection.LIKED -> browsableMediaItem(
                                         "${MusicService.PLAYLIST}/${PlaylistEntity.LIKED_PLAYLIST_ID}",
                                         context.getString(R.string.liked_songs),
@@ -350,8 +376,146 @@ constructor(
 
                     MusicService.SPOTIFY_PLAYLIST -> fetchSpotifyPlaylistItems()
 
+                    MusicService.RADIO -> {
+                        val favs = RadioFavoritesManager(context).getFavorites()
+                        val categories = listOf(
+                            browsableMediaItem(
+                                "${MusicService.RADIO}/favorites",
+                                context.getString(R.string.radio_favorites),
+                                null,
+                                drawableUri(R.drawable.favorite),
+                                MediaMetadata.MEDIA_TYPE_FOLDER_RADIO_STATIONS,
+                            ),
+                            browsableMediaItem(
+                                "${MusicService.RADIO}/top",
+                                context.getString(R.string.radio_top_stations),
+                                null,
+                                drawableUri(R.drawable.trending_up),
+                                MediaMetadata.MEDIA_TYPE_FOLDER_RADIO_STATIONS,
+                            ),
+                            browsableMediaItem(
+                                "${MusicService.RADIO}/countries",
+                                context.getString(R.string.radio_countries),
+                                null,
+                                drawableUri(R.drawable.language),
+                                MediaMetadata.MEDIA_TYPE_FOLDER_RADIO_STATIONS,
+                            ),
+                            browsableMediaItem(
+                                "${MusicService.RADIO}/recordings",
+                                context.getString(R.string.radio_recordings),
+                                null,
+                                drawableUri(R.drawable.mic),
+                                MediaMetadata.MEDIA_TYPE_FOLDER_MIXED,
+                            ),
+                        )
+                        val favStations = favs.map { station ->
+                            station.toMediaItem().buildUpon()
+                                .setMediaId("${MusicService.RADIO}/${station.stationuuid}")
+                                .build()
+                        }
+                        categories + favStations
+                    }
+
+                    MusicService.TV -> {
+                        val repo = TvChannelsRepository(context)
+                        repo.getDefaultChannels().map { channel ->
+                            MediaItem.Builder()
+                                .setMediaId("${MusicService.TV}/${channel.id}")
+                                .setMediaMetadata(
+                                    MediaMetadata.Builder()
+                                        .setTitle(channel.name)
+                                        .setSubtitle(channel.description)
+                                        .setArtworkUri(channel.logoUrl.toUri())
+                                        .setIsPlayable(true)
+                                        .setIsBrowsable(false)
+                                        .setMediaType(MediaMetadata.MEDIA_TYPE_RADIO_STATION)
+                                        .build()
+                                )
+                                .build()
+                        }
+                    }
+
+                    MusicService.LOCAL -> {
+                        database.allSongs().first()
+                            .filter { it.song.isLocal }
+                            .map { it.toMediaItem(MusicService.LOCAL) }
+                    }
+
                     else ->
                         when {
+                            parentId == "${MusicService.RADIO}/favorites" -> {
+                                val favs = RadioFavoritesManager(context).getFavorites()
+                                favs.map { station ->
+                                    station.toMediaItem().buildUpon()
+                                        .setMediaId("${MusicService.RADIO}/${station.stationuuid}")
+                                        .build()
+                                }
+                            }
+
+                            parentId == "${MusicService.RADIO}/top" -> {
+                                val top = runCatching { RadioBrowserClient.getTopClicked(50) }.getOrDefault(RadioFavoritesManager.DEFAULT_STATIONS)
+                                top.map { station ->
+                                    station.toMediaItem().buildUpon()
+                                        .setMediaId("${MusicService.RADIO}/${station.stationuuid}")
+                                        .build()
+                                }
+                            }
+
+                            parentId == "${MusicService.RADIO}/countries" -> {
+                                val popularCountries = listOf(
+                                    Pair("AR", "Argentina"),
+                                    Pair("ES", "España"),
+                                    Pair("MX", "México"),
+                                    Pair("CO", "Colombia"),
+                                    Pair("CL", "Chile"),
+                                    Pair("UY", "Uruguay"),
+                                    Pair("US", "Estados Unidos"),
+                                    Pair("BR", "Brasil"),
+                                    Pair("GB", "Reino Unido"),
+                                    Pair("IT", "Italia"),
+                                    Pair("FR", "Francia"),
+                                    Pair("DE", "Alemania"),
+                                )
+                                popularCountries.map { (code, name) ->
+                                    browsableMediaItem(
+                                        "${MusicService.RADIO}/country/$code",
+                                        name,
+                                        null,
+                                        drawableUri(R.drawable.language),
+                                        MediaMetadata.MEDIA_TYPE_FOLDER_RADIO_STATIONS,
+                                    )
+                                }
+                            }
+
+                            parentId.startsWith("${MusicService.RADIO}/country/") -> {
+                                val code = parentId.removePrefix("${MusicService.RADIO}/country/")
+                                val stations = runCatching { RadioBrowserClient.searchStations(countryCode = code, limit = 50) }.getOrDefault(emptyList())
+                                stations.map { station ->
+                                    station.toMediaItem().buildUpon()
+                                        .setMediaId("${MusicService.RADIO}/${station.stationuuid}")
+                                        .build()
+                                }
+                            }
+
+                            parentId == "${MusicService.RADIO}/recordings" -> {
+                                val recManager = RadioRecordingManager.getInstance(context)
+                                recManager.recordings.value.map { rec ->
+                                    MediaItem.Builder()
+                                        .setMediaId("${MusicService.RADIO}/recording/${rec.id}")
+                                        .setUri(File(rec.filePath).toUri())
+                                        .setMediaMetadata(
+                                            MediaMetadata.Builder()
+                                                .setTitle(rec.title)
+                                                .setArtist(rec.stationName)
+                                                .setSubtitle(rec.stationName)
+                                                .setIsPlayable(true)
+                                                .setIsBrowsable(false)
+                                                .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
+                                                .build()
+                                        )
+                                        .build()
+                                }
+                            }
                             parentId.startsWith("${MusicService.ARTIST}/") ->
                                 database.artistSongsByCreateDateAsc(parentId.removePrefix("${MusicService.ARTIST}/"))
                                     .first().map {
@@ -997,6 +1161,92 @@ constructor(
                     )
                 }
 
+                MusicService.RADIO -> {
+                    val subType = path.getOrNull(1) ?: return@future defaultResult
+                    if (subType == "recording" || subType == "recordings") {
+                        val recId = path.getOrNull(2) ?: return@future defaultResult
+                        val recManager = RadioRecordingManager.getInstance(context)
+                        val rec = recManager.recordings.value.find { it.id == recId }
+                        if (rec != null) {
+                            val mediaItem = MediaItem.Builder()
+                                .setMediaId("local:${rec.id}")
+                                .setUri(File(rec.filePath).toUri())
+                                .setMediaMetadata(
+                                    MediaMetadata.Builder()
+                                        .setTitle(rec.title)
+                                        .setArtist(rec.stationName)
+                                        .setSubtitle(rec.stationName)
+                                        .setIsPlayable(true)
+                                        .setIsBrowsable(false)
+                                        .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
+                                        .build()
+                                )
+                                .build()
+                            MediaItemsWithStartPosition(listOf(mediaItem), 0, C.TIME_UNSET)
+                        } else defaultResult
+                    } else {
+                        val stationId = subType
+                        val favs = RadioFavoritesManager(context).getFavorites()
+                        var station = favs.find { it.stationuuid == stationId }
+                        if (station == null) {
+                            val top = runCatching { RadioBrowserClient.getTopClicked(50) }.getOrDefault(emptyList())
+                            station = top.find { it.stationuuid == stationId }
+                        }
+                        if (station == null) {
+                            station = RadioFavoritesManager.DEFAULT_STATIONS.find { it.stationuuid == stationId }
+                        }
+                        if (station == null) {
+                            station = runCatching { RadioBrowserClient.getStationByUuid(stationId) }.getOrNull()
+                        }
+                        if (station != null) {
+                            MediaItemsWithStartPosition(
+                                listOf(station.toMediaItem()),
+                                0,
+                                C.TIME_UNSET
+                            )
+                        } else defaultResult
+                    }
+                }
+
+                MusicService.TV -> {
+                    val channelId = path.getOrNull(1) ?: return@future defaultResult
+                    val repo = TvChannelsRepository(context)
+                    val channel = repo.getDefaultChannels().find { it.id == channelId }
+                        ?: repo.getDefaultChannels().find { it.name.equals(channelId, ignoreCase = true) }
+                    if (channel != null) {
+                        val resolved = repo.resolveStreamUri(channel) ?: channel.directStreamUrl
+                        if (resolved != null) {
+                            val streamUrl = if (resolved.startsWith("http")) resolved else "https://www.youtube.com/watch?v=$resolved"
+                            val mediaId = if (resolved.startsWith("tv:")) resolved else "tv:$resolved"
+                            val metadata = com.metrolist.music.models.MediaMetadata(
+                                id = mediaId,
+                                title = channel.name,
+                                artists = listOf(com.metrolist.music.models.MediaMetadata.Artist(name = channel.category.displayName, id = null)),
+                                duration = -1,
+                                thumbnailUrl = channel.logoUrl,
+                            )
+                            val mediaItem = metadata.toMediaItem().buildUpon()
+                                .setUri(streamUrl.toUri())
+                                .build()
+                            MediaItemsWithStartPosition(
+                                listOf(mediaItem),
+                                0,
+                                C.TIME_UNSET
+                            )
+                        } else defaultResult
+                    } else defaultResult
+                }
+
+                MusicService.LOCAL -> {
+                    val songId = path.getOrNull(1) ?: return@future defaultResult
+                    val localSongs = database.allSongs().first().filter { it.song.isLocal }
+                    MediaItemsWithStartPosition(
+                        localSongs.map { it.toMediaItem() },
+                        localSongs.indexOfFirst { it.id == songId }.takeIf { it != -1 } ?: 0,
+                        startPositionMs
+                    )
+                }
+
                 else -> defaultResult
             }
         }
@@ -1207,6 +1457,9 @@ internal fun isBrowsableMediaId(mediaId: String): Boolean =
         mediaId == MusicService.ALBUM ||
         mediaId == MusicService.PLAYLIST ||
         mediaId == MusicService.YOUTUBE_PLAYLIST ||
+        mediaId == MusicService.RADIO ||
+        mediaId == MusicService.TV ||
+        mediaId == MusicService.LOCAL ||
         mediaId.startsWith("${MusicService.ARTIST}/") ||
         mediaId.startsWith("${MusicService.ALBUM}/") ||
         mediaId.startsWith("${MusicService.PLAYLIST}/") ||

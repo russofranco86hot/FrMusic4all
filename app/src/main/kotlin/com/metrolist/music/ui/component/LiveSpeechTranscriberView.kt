@@ -66,6 +66,7 @@ import com.metrolist.music.lyrics.LiveSpeechTranscriber
 fun LiveSpeechTranscriberView(
     modifier: Modifier = Modifier,
     isRadioOrLive: Boolean = false,
+    autoStart: Boolean = false,
 ) {
     val context = LocalContext.current
     val isListening by LiveSpeechTranscriber.isListening.collectAsStateWithLifecycle()
@@ -98,6 +99,18 @@ fun LiveSpeechTranscriberView(
                 context.getString(R.string.live_transcription_permission_needed),
                 Toast.LENGTH_SHORT,
             ).show()
+        }
+    }
+
+    LaunchedEffect(autoStart) {
+        if (autoStart && !isListening) {
+            val hasPerm = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO,
+            ) == PackageManager.PERMISSION_GRANTED
+            if (hasPerm) {
+                LiveSpeechTranscriber.start(context)
+            }
         }
     }
 
@@ -201,7 +214,7 @@ fun LiveSpeechTranscriberView(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isListening) stringResource(R.string.live_transcription_listening) else "Transcripción pausada",
+                        text = if (isListening) stringResource(R.string.lyrics_transcribing_live) else "Transcripción pausada",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = if (isListening) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),

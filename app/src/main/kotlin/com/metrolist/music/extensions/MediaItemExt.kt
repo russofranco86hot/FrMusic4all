@@ -42,12 +42,13 @@ fun MediaMetadata.toMediaItem(): MediaItem {
         isTv -> resolvedMetadata.id.removePrefix("tv:")
         else -> resolvedMetadata.id
     }
+    val isDirectUrl = streamUri.startsWith("http://") || streamUri.startsWith("https://")
     val isHls = isLive && (streamUri.contains(".m3u8", ignoreCase = true) || streamUri.contains("hls", ignoreCase = true))
 
     return MediaItem.Builder()
         .setMediaId(resolvedMetadata.id)
         .setUri(streamUri)
-        .setCustomCacheKey(if (isLive) null else resolvedMetadata.id)
+        .setCustomCacheKey(if (isLive && isDirectUrl) null else resolvedMetadata.id)
         .apply {
             if (isLive) {
                 setLiveConfiguration(
@@ -71,7 +72,7 @@ fun MediaMetadata.toMediaItem(): MediaItem {
                 .setAlbumTitle(resolvedMetadata.album?.title)
                 .setAlbumArtist(resolvedMetadata.artists.firstOrNull()?.name)
                 .setDisplayTitle(resolvedMetadata.title)
-                .setMediaType(if (isRadio) androidx.media3.common.MediaMetadata.MEDIA_TYPE_RADIO_STATION else MEDIA_TYPE_MUSIC)
+                .setMediaType(if (isRadio || isTv) androidx.media3.common.MediaMetadata.MEDIA_TYPE_RADIO_STATION else MEDIA_TYPE_MUSIC)
                 .setIsBrowsable(false)
                 .setIsPlayable(true)
                 .setExtras(Bundle().apply {

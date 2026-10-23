@@ -14,6 +14,8 @@ import com.metrolist.music.playback.PlayerConnection
 import com.metrolist.music.playback.queues.ListQueue
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
@@ -37,6 +40,11 @@ class TvStreamingViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+    private val _liveSearchResults = MutableStateFlow<List<TvChannel>>(emptyList())
+    val liveSearchResults: StateFlow<List<TvChannel>> = _liveSearchResults.asStateFlow()
+
+    private var searchJob: Job? = null
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -49,8 +57,10 @@ class TvStreamingViewModel @Inject constructor(
         _selectedCategory,
         _searchQuery,
         repository.favoriteIds,
-    ) { category, query, favIds ->
-        defaultChannels
+        repository.customChannels,
+    ) { category, query, favIds, customList ->
+        val all = customList + defaultChannels
+        all
             .map { it.copy(isFavorite = favIds.contains(it.id)) }
             .filter { channel ->
                 val matchesCategory = when (category) {
@@ -73,6 +83,46 @@ class TvStreamingViewModel @Inject constructor(
 
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
+        searchJob?.cancel()
+        if (query.trim().length >= 3) {
+            searchJob = viewModelScope.launch {
+                delay(600)
+                try {
+                    val results = repository.searchLiveStreamsFromYouTube(query.trim())
+                    _liveSearchResults.value = results
+                } catch (e: Exception) {
+                    Timber.w(e, "Error searching live streams")
+                }
+            }
+        } else {
+            _liveSearchResults.value = emptyList()
+        }
+    }
+
+    fun addCustomChannel(name: String, streamOrHandle: String, category: TvCategory) {
+        viewModelScope.launch {
+            val trimmed = streamOrHandle.trim()
+            val isHandle = trimmed.startsWith("@") || (!trimmed.startsWith("http") && !trimmed.contains("/"))
+            val isDirectStream = trimmed.startsWith("http") && !trimmed.contains("youtube.com") && !trimmed.contains("youtu.be")
+            val isYtUrl = trimmed.contains("youtube.com") || trimmed.contains("youtu.be")
+
+            val channel = TvChannel(
+                id = "custom_${UUID.randomUUID().toString().take(8)}",
+                name = name.trim(),
+                category = category,
+                description = if (isDirectStream) "Transmisión personalizada" else "Canal de YouTube",
+                youtubeHandle = if (isHandle) trimmed else null,
+                directStreamUrl = if (isDirectStream || isYtUrl) trimmed else null,
+                isCustom = true
+            )
+            repository.addCustomChannel(channel)
+        }
+    }
+
+    fun removeCustomChannel(channelId: String) {
+        viewModelScope.launch {
+            repository.removeCustomChannel(channelId)
+        }
     }
 
     fun toggleFavorite(channelId: String) {
@@ -96,7 +146,7 @@ class TvStreamingViewModel @Inject constructor(
                 val mediaId = if (resolvedStream.startsWith("http")) {
                     "tv:$resolvedStream"
                 } else {
-                    resolvedStream // 11-char YouTube video ID
+                    "tv:https://www.youtube.com/watch?v=$resolvedStream"
                 }
 
                 val metadata = MediaMetadata(

@@ -8,9 +8,12 @@ package com.metrolist.music.lyrics
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.widget.Toast
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +23,7 @@ import java.util.Locale
 object LiveSpeechTranscriber {
     private var recognizer: SpeechRecognizer? = null
     private var appContext: Context? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private val _isListening = MutableStateFlow(false)
     val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
@@ -31,6 +35,7 @@ object LiveSpeechTranscriber {
     val currentPartialText: StateFlow<String> = _currentPartialText.asStateFlow()
 
     private var shouldKeepListening = false
+    private var currentLanguageTag: String? = null
 
     private val listener = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) {
@@ -52,9 +57,14 @@ object LiveSpeechTranscriber {
 
         override fun onError(error: Int) {
             Timber.w("LiveSpeech: recognition error: $error")
-            if (shouldKeepListening) {
-                // Restart recognition on silence / timeout
-                restartListening()
+            val isPermissionError = error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS
+            if (shouldKeepListening && !isPermissionError) {
+                // Delay restart to let audio hardware/recognizer recycle cleanly
+                mainHandler.postDelayed({
+                    if (shouldKeepListening) {
+                        restartListening()
+                    }
+                }, 500)
             } else {
                 _isListening.value = false
             }
@@ -71,7 +81,11 @@ object LiveSpeechTranscriber {
             _currentPartialText.value = ""
 
             if (shouldKeepListening) {
-                restartListening()
+                mainHandler.postDelayed({
+                    if (shouldKeepListening) {
+                        restartListening()
+                    }
+                }, 200)
             } else {
                 _isListening.value = false
             }
@@ -91,26 +105,35 @@ object LiveSpeechTranscriber {
     fun start(context: Context, languageTag: String? = null) {
         val app = context.applicationContext
         appContext = app
-
-        if (!SpeechRecognizer.isRecognitionAvailable(app)) {
-            Timber.w("LiveSpeech: speech recognition is not available on this device")
-            return
-        }
-
-        stop()
+        currentLanguageTag = languageTag
 
         shouldKeepListening = true
+        _isListening.value = true
         _transcribedLines.value = emptyList()
         _currentPartialText.value = ""
 
-        try {
-            recognizer = SpeechRecognizer.createSpeechRecognizer(app).apply {
-                setRecognitionListener(listener)
+        mainHandler.post {
+            try {
+                recognizer?.destroy()
+                val newRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+                    setRecognitionListener(listener)
+                }
+                recognizer = newRecognizer
+                startListeningInternal(languageTag)
+            } catch (e: Exception) {
+                Timber.e(e, "LiveSpeech: failed to create speech recognizer")
+                try {
+                    val fallbackRecognizer = SpeechRecognizer.createSpeechRecognizer(app).apply {
+                        setRecognitionListener(listener)
+                    }
+                    recognizer = fallbackRecognizer
+                    startListeningInternal(languageTag)
+                } catch (e2: Exception) {
+                    Timber.e(e2, "LiveSpeech: fallback recognizer creation also failed")
+                    _isListening.value = false
+                    Toast.makeText(context, "El servicio de voz no pudo iniciarse en este dispositivo.", Toast.LENGTH_SHORT).show()
+                }
             }
-            startListeningInternal(languageTag)
-        } catch (e: Exception) {
-            Timber.e(e, "LiveSpeech: failed to create speech recognizer")
-            _isListening.value = false
         }
     }
 
@@ -118,10 +141,13 @@ object LiveSpeechTranscriber {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
             val lang = languageTag ?: Locale.getDefault().toLanguageTag()
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang)
+            appContext?.packageName?.let { pkg ->
+                putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, pkg)
+            }
         }
         try {
             recognizer?.startListening(intent)
@@ -134,26 +160,29 @@ object LiveSpeechTranscriber {
 
     private fun restartListening() {
         if (!shouldKeepListening) return
-        try {
-            recognizer?.cancel()
-            startListeningInternal()
-        } catch (e: Exception) {
-            Timber.w(e, "LiveSpeech: failed to restart listening")
+        mainHandler.post {
+            try {
+                recognizer?.cancel()
+                startListeningInternal(currentLanguageTag)
+            } catch (e: Exception) {
+                Timber.w(e, "LiveSpeech: error restarting listener")
+            }
         }
     }
 
     fun stop() {
         shouldKeepListening = false
-        try {
-            recognizer?.stopListening()
-            recognizer?.cancel()
-            recognizer?.destroy()
-        } catch (e: Exception) {
-            Timber.w(e, "LiveSpeech: error while stopping")
-        } finally {
-            recognizer = null
-            _isListening.value = false
-            _currentPartialText.value = ""
+        _isListening.value = false
+        _currentPartialText.value = ""
+        mainHandler.post {
+            try {
+                recognizer?.stopListening()
+                recognizer?.cancel()
+                recognizer?.destroy()
+                recognizer = null
+            } catch (e: Exception) {
+                Timber.e(e, "LiveSpeech: error stopping recognizer")
+            }
         }
     }
 

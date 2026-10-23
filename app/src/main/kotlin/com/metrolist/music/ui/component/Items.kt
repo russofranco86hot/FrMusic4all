@@ -99,6 +99,7 @@ import com.metrolist.innertube.models.YTItem
 import com.metrolist.music.LocalDatabase
 import com.metrolist.music.LocalArtistNameAliases
 import com.metrolist.music.LocalDownloadUtil
+import com.metrolist.music.LocalIsWatch
 import com.metrolist.music.LocalNavController
 import com.metrolist.music.LocalPlayerConnection
 import com.metrolist.music.R
@@ -111,6 +112,8 @@ import com.metrolist.music.constants.ListThumbnailSize
 import com.metrolist.music.constants.SmallGridThumbnailHeight
 import com.metrolist.music.constants.SwipeToSongKey
 import com.metrolist.music.constants.ThumbnailCornerRadius
+import com.metrolist.music.constants.WatchListItemHeight
+import com.metrolist.music.constants.WatchListThumbnailSize
 import com.metrolist.music.db.entities.Album
 import com.metrolist.music.db.entities.Artist
 import com.metrolist.music.db.entities.ArtistEntity
@@ -259,12 +262,18 @@ inline fun ListItem(
     isActive: Boolean = false,
     isAvailable: Boolean = true,
 ) {
+    val isWatch = LocalIsWatch.current
+    val effectiveHeight = if (isWatch) WatchListItemHeight else ListItemHeight
+    val effectiveHorizontalPadding = if (isWatch) 4.dp else 8.dp
+    val effectiveThumbPadding = if (isWatch) 2.dp else 6.dp
+    val effectiveThumbSize = if (isWatch) WatchListThumbnailSize else ListThumbnailSize
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = if (isActive) {
             modifier // playing highlight
-                .height(ListItemHeight)
-                .padding(horizontal = 8.dp)
+                .height(effectiveHeight)
+                .padding(horizontal = effectiveHorizontalPadding)
                 .clip(RoundedCornerShape(8.dp))
                 .background(
                     color = // selected active
@@ -273,25 +282,25 @@ inline fun ListItem(
                 )
         } else if (isSelected == true) {
             modifier // inactive selected
-                .height(ListItemHeight)
-                .padding(horizontal = 8.dp)
+                .height(effectiveHeight)
+                .padding(horizontal = effectiveHorizontalPadding)
                 .clip(RoundedCornerShape(8.dp))
                 .background(color = MaterialTheme.colorScheme.inversePrimary.copy(alpha = 0.4f))
         } else {
             modifier // default
-                .height(ListItemHeight)
-                .padding(horizontal = 8.dp)
+                .height(effectiveHeight)
+                .padding(horizontal = effectiveHorizontalPadding)
         }
     ) {
         Box(
-            modifier = Modifier.padding(6.dp),
+            modifier = Modifier.padding(effectiveThumbPadding),
             contentAlignment = Alignment.Center
         ) {
             thumbnailContent()
             if (!isAvailable) {
                 Box(
                     modifier = Modifier
-                        .size(ListThumbnailSize)
+                        .size(effectiveThumbSize)
                         .align(Alignment.Center)
                         .background(
                             Color.Black.copy(alpha = 0.25f),
@@ -303,7 +312,7 @@ inline fun ListItem(
                         contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier
-                            .size(ListThumbnailSize / 2)
+                            .size(effectiveThumbSize / 2)
                             .align(Alignment.Center)
                             .graphicsLayer { alpha = 1f }
                     )
@@ -552,7 +561,7 @@ fun SongListItem(
                      isActive = isActive,
                      isPlaying = isPlaying,
                      shape = RoundedCornerShape(ThumbnailCornerRadius),
-                     modifier = Modifier.size(ListThumbnailSize)
+                     modifier = Modifier.size(if (LocalIsWatch.current) WatchListThumbnailSize else ListThumbnailSize)
                  )
              },
              trailingContent = trailingContent,
@@ -673,7 +682,7 @@ fun ArtistListItem(
                 .build(),
             contentDescription = null,
             modifier = Modifier
-                .size(ListThumbnailSize)
+                .size(if (LocalIsWatch.current) WatchListThumbnailSize else ListThumbnailSize)
                 .clip(CircleShape),
         )
     },
@@ -778,7 +787,7 @@ fun AlbumListItem(
             isActive = isActive,
             isPlaying = isPlaying,
             shape = RoundedCornerShape(ThumbnailCornerRadius),
-            modifier = Modifier.size(ListThumbnailSize)
+            modifier = Modifier.size(if (LocalIsWatch.current) WatchListThumbnailSize else ListThumbnailSize)
         )
     },
     trailingContent = trailingContent,
@@ -935,7 +944,7 @@ fun PlaylistListItem(
     thumbnailContent = {
         PlaylistThumbnail(
             thumbnails = playlist.thumbnails,
-            size = ListThumbnailSize,
+            size = if (LocalIsWatch.current) WatchListThumbnailSize else ListThumbnailSize,
             placeHolder = {
                 val painter = when (playlist.playlist.name) {
                     stringResource(R.string.liked) -> R.drawable.favorite_border
@@ -1116,7 +1125,7 @@ fun MediaMetadataListItem(
                 isActive = isActive,
                 isPlaying = isPlaying,
                 shape = RoundedCornerShape(ThumbnailCornerRadius),
-                modifier = Modifier.size(ListThumbnailSize)
+                modifier = Modifier.size(if (LocalIsWatch.current) WatchListThumbnailSize else ListThumbnailSize)
             )
         },
         trailingContent = trailingContent,
@@ -1217,7 +1226,7 @@ fun YouTubeListItem(
                     isActive = isActive,
                     isPlaying = isPlaying,
                     shape = if (item is ArtistItem) CircleShape else RoundedCornerShape(ThumbnailCornerRadius),
-                    modifier = Modifier.size(ListThumbnailSize)
+                    modifier = Modifier.size(if (LocalIsWatch.current) WatchListThumbnailSize else ListThumbnailSize)
                 )
             },
             trailingContent = trailingContent,

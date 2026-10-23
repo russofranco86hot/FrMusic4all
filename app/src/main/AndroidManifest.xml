@@ -39,8 +39,12 @@
 
     <queries>
         <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
             <action android:name="android.media.action.DISPLAY_AUDIO_EFFECT_CONTROL_PANEL" />
         </intent>
+        <package android:name="com.google.android.googlequicksearchbox" />
         <package android:name="com.google.android.projection.gearhead" />
     </queries>
     <application
